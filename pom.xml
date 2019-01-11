@@ -137,6 +137,11 @@
     <profiles>
         <profile>
             <id>codacycoverage</id>
+            <activation>
+                <property>
+                    <name>env.CODACY_PROJECT_TOKEN</name>
+                </property>
+            </activation>
             <build>
                 <plugins>
                     <plugin>
