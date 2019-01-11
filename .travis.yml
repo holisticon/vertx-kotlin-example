@@ -4,4 +4,4 @@ jdk: oraclejdk11
 install:
   - mvn test-compile -DskipTests=true -Dmaven.javadoc.skip=true -B -V -P codacycoverage
 script:
-  - mvn clean jacoco:prepare-agent install jacoco:report  -P no-docker,codacycoverage
+  - mvn clean jacoco:prepare-agent install jacoco:report  -P codacycoverage
