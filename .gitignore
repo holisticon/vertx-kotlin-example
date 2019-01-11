@@ -1,0 +1,10 @@
+/target
+*.iml
+.idea/
+.gitsecret/keys/random_seed
+.env
+.DS_Store
+.classpath
+.vertx/
+.project
+.settings/

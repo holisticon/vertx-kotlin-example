@@ -1,0 +1,211 @@
+openapi: '3.0.0'
+info:
+  version: 1.1.0
+  title: apodrating
+  description: "The apod rating app lets you rate NASA's Astronomy Picture of the Day and view ratings for them."
+servers:
+  - url: http://localhost:8081
+  - url: https://localhost:8443
+paths:
+  /apod:
+    post:
+      summary: create an apod with the specified date
+      operationId: postApod
+      security:
+        - ApiKeyAuth: []
+      tags:
+        - apodrating
+      requestBody:
+        required: true
+        description: The rating you want to set
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApodRequest'
+      responses:
+        '201':
+          description: Apod entry created
+        '409':
+          description: Apod entry already exists
+    get:
+      summary: get all apods
+      operationId: getApods
+      security:
+        - ApiKeyAuth: []
+      tags:
+        - apodrating
+      responses:
+        '200':
+          description: the picture's title and hd uri
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Apod'
+        '404':
+          description: the requested apod could not be found
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /apod/{apodId}:
+    get:
+      summary: get an apod for the specified date
+      operationId: getApodForDate
+      security:
+        - ApiKeyAuth: []
+      tags:
+        - apodrating
+      parameters:
+        - name: apodId
+          in: path
+          required: true
+          description: the id of the picture
+          schema:
+            type: string
+      responses:
+        '200':
+          description: the picture's title and hd uri
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Apod'
+        '404':
+          description: the requested apod could not be found
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /apod/{apodId}/rating:
+    get:
+      summary: get apod rating
+      operationId: getRating
+      tags:
+        - apodrating
+      parameters:
+        - name: apodId
+          in: path
+          required: true
+          description: the id of the apod
+          schema:
+            type: string
+      responses:
+        '200':
+          description: the requested apod
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rating'
+        '404':
+          description: the requested apod could not be found
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      summary: set apod rating
+      operationId: putRating
+      tags:
+        - apodrating
+      parameters:
+        - name: apodId
+          in: path
+          required: true
+          description: the id of the apod
+          schema:
+            type: string
+      requestBody:
+        required: true
+        description: The rating you want to set
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RatingRequest'
+      responses:
+        '204':
+          description: Rating changed
+        '400':
+          description: Invalid request
+
+components:
+  securitySchemes:
+    ApiKeyAuth:        # arbitrary name for the security scheme
+      type: apiKey
+      in: header       # can be "header", "query" or "cookie"
+      name: X-API-KEY  # name of the header, query parameter or cookie
+  schemas:
+    Apod:
+      description: the apod data object
+      required:
+        - id
+        - title
+        - imageUriHd
+      properties:
+        id:
+          description: The unique id of this apod
+          readOnly: true
+          type: string
+        dateString:
+          description: The date string of this apod
+          readOnly: true
+          type: string
+        title:
+          description: The title of this apod
+          readOnly: true
+          type: string
+        imageUriHd:
+          description: The uri of this image in hd resolution
+          readOnly: true
+          type: string
+    RatingRequest:
+      description: An Apod rating request payload
+      required:
+        - rating
+      properties:
+        rating:
+          description: The title of this apod
+          type: integer
+          format: int32
+    ApodRequest:
+      description: a create apod request payload
+      required:
+        - dateString
+      properties:
+        dateString:
+          description: The date string of this apod
+          type: string
+          readOnly: true
+    Rating:
+      description: an apod rating
+      required:
+        - id
+        - rating
+      properties:
+        id:
+          description: The unique id of this apod
+          readOnly: true
+          type: integer
+          format: int32
+        rating:
+          description: The title of this apod
+          type: integer
+          format: int32
+    Error:
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: integer
+          format: int32
+        message:
+          type: string
+
