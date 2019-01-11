@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/holisticon/vertx-kotlin-example.svg?branch=master)](https://travis-ci.org/holisticon/vertx-kotlin-example)
+
 # A microservice example based on Vert.x, Kotlin and OpenAPI 3 
 
 This is an example for building a microservice with a technology stack consisting of
