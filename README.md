@@ -14,6 +14,19 @@ Requires a JDK 11 or newer due to the usage of the http2 protocol and ALPN.
 
 Furthermore, you need a NASA api key. You can apply for one at [their website](https://api.nasa.gov/index.html#apply-for-an-api-key).
 
+## Before you start
+
+Setup the environment as follows:
+1. copy `.env.txt` to `.env`
+   ```bash
+   > cp .env.txt .env && chmod 755 .env
+   ```
+1. in `.env`, set the values for `JAVA_HOME` and `NASA_API_KEY`. `JAVA_HOME` must point to your local installation of a JDK 11.
+```bash
+export JAVA_HOME="/PATH/TO_JDK_v11_HOME"
+export NASA_API_KEY=YOUR_NASA_API_KEY
+```
+
 ## Building
 
 The `pom.xml` contains a default maven goal that you can use if yu have a 
@@ -28,19 +41,6 @@ the file `test-compile.sh`:
 
 ```bash
 > ./test-compile.sh 
-```
-
-## Before you start
-
-Setup the environment as follows:
-1. copy `.env.txt` to `.env`
-   ```bash
-   > cp .env.txt .env && chmod 755 .env
-   ```
-1. in `.env`, set the values for `JAVA_HOME` and `NASA_API_KEY`. `JAVA_HOME` must point to your local installation of a JDK 11.
-```bash
-export JAVA_HOME="/PATH/TO_JDK_v11_HOME"
-export NASA_API_KEY=YOUR_NASA_API_KEY
 ```
 
 ### Running from the IDE
