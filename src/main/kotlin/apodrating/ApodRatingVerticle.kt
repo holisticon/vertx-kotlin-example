@@ -55,6 +55,7 @@ class ApodRatingVerticle : CoroutineVerticle() {
     private lateinit var apodCache: Cache<String, Apod>
     private lateinit var rxVertx: Vertx
     private lateinit var circuitBreaker: CircuitBreaker
+    private lateinit var webClient: WebClient
 
     /**
      * - Start the verticle.
@@ -75,24 +76,26 @@ class ApodRatingVerticle : CoroutineVerticle() {
         client = JDBCClient.createShared(vertx, apodConfig.toJsonObject())
         apiKey = apodConfig.nasaApiKey
 
-        CacheManagerBuilder.newCacheManagerBuilder()
-            .withCache(
-                "apodCache",
-                CacheConfigurationBuilder
-                    .newCacheConfigurationBuilder(
-                        String::class.java,
-                        Apod::class.java,
-                        ResourcePoolsBuilder.heap(10)
-                    )
-            ).build()
-            .apply {
-                this.init()
-                apodCache = this.getCache(
+        launch {
+            CacheManagerBuilder.newCacheManagerBuilder()
+                .withCache(
                     "apodCache",
-                    String::class.java,
-                    Apod::class.java
-                )
-            }
+                    CacheConfigurationBuilder
+                        .newCacheConfigurationBuilder(
+                            String::class.java,
+                            Apod::class.java,
+                            ResourcePoolsBuilder.heap(10)
+                        )
+                ).build()
+                .apply {
+                    this.init()
+                    apodCache = this.getCache(
+                        "apodCache",
+                        String::class.java,
+                        Apod::class.java
+                    )
+                }
+        }.join()
 
         launch {
             circuitBreaker = CircuitBreaker.create(
@@ -105,6 +108,10 @@ class ApodRatingVerticle : CoroutineVerticle() {
                     maxRetries = 3 // the number of times the circuit breaker tries to redo the operation before failing
                 )
             )
+        }.join()
+
+        launch {
+            webClient = WebClient.create(rxVertx)
         }.join()
 
         // Populate database
@@ -315,7 +322,7 @@ class ApodRatingVerticle : CoroutineVerticle() {
         date: String,
         nasaApiKey: String,
         id: String
-    ): Single<Apod> = WebClient.create(rxVertx).getAbs("https://api.nasa.gov")
+    ): Single<Apod> = webClient.getAbs("https://api.nasa.gov")
         .uri("/planetary/apod")
         .addQueryParam("date", date)
         .addQueryParam("api_key", nasaApiKey)
