@@ -1,2 +1,2 @@
 #!/bin/bash
-mvn jgitflow:release-start -DallowSnapshots=true -P no-docker -Dmaven.javadoc.skip=true
+mvn gitflow:release-start -DallowSnapshots=true -P no-docker -Dmaven.javadoc.skip=true
