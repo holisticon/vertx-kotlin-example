@@ -17,12 +17,18 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 
+/**
+ * Unit test for ApodRatingVerticle
+ */
 @DisplayName("👋 A fairly basic test example")
 @ExtendWith(VertxExtension::class)
 class ApodRatingVerticleTest {
 
     companion object : KLogging()
 
+    /**
+     * Prepare test by deploying the verticle.
+     */
     @BeforeEach
     @DisplayName("Deploy verticle ")
     fun deployVerticle(vertx: Vertx, testContext: VertxTestContext) {
@@ -50,6 +56,9 @@ class ApodRatingVerticleTest {
             }
     }
 
+    /**
+     * Perform test.
+     */
     @DisplayName("Get Rating")
     @Test
     fun getApod(vertx: Vertx, testContext: VertxTestContext) {
@@ -69,6 +78,9 @@ class ApodRatingVerticleTest {
             }
     }
 
+    /**
+     * Undeply Verticle.
+     */
     @AfterEach
     @DisplayName("Undeploy verticle ")
     fun undeployVerticle(vertx: Vertx) {

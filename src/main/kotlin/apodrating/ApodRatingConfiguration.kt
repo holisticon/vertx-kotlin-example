@@ -26,6 +26,9 @@ data class ApodRatingConfiguration(val config: JsonObject) {
     }
 }
 
+/**
+ * Convert ConfigRetrieverOptions into DeploymentOptions
+ */
 fun ConfigRetrieverOptions.deploymentOptions(vertx: Vertx): DeploymentOptions =
     DeploymentOptions(
         JsonObject().put(

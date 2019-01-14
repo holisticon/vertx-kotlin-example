@@ -148,7 +148,8 @@ class ApodRatingVerticle : CoroutineVerticle() {
 
         Single.zip<HttpServer, List<Int>>(listOf(http11Server, http2Server)) { servers ->
             servers
-                .map { eachServer -> eachServer as HttpServer }
+                .filter { it is HttpServer }
+                .map { it as HttpServer }
                 .map { eachHttpServer ->
                     logger.info { "port: ${eachHttpServer.actualPort()}" }
                     eachHttpServer.actualPort()
@@ -250,6 +251,7 @@ class ApodRatingVerticle : CoroutineVerticle() {
                 .toList()
             Single.zip<Apod, List<Apod>>(singleApods) { emittedApodsAsJsonArray ->
                 emittedApodsAsJsonArray
+                    .filter { it is Apod }
                     .map { it as Apod }
                     .filter { !it.isEmpty() }
             }.subscribeOn(Schedulers.io())
