@@ -1,0 +1,8 @@
+engines:
+  Detekt:
+    enabled: true
+  coverage:
+    enabled: true
+exclude_paths:
+  - 'src/main/resources/webroot/**'
+  - 'src/*est/**'

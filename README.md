@@ -24,7 +24,7 @@ Setup the environment as follows:
 1. in `.env`, set the values for `JAVA_HOME` and `NASA_API_KEY`. `JAVA_HOME` must point to your local installation of a JDK 11.
 ```bash
 export JAVA_HOME="/PATH/TO_JDK_v11_HOME"
-export NASA_API_KEY=YOUR_NASA_API_KEY
+export NASA_API_KEY="YOUR_NASA_API_KEY"
 ```
 
 ## Building
