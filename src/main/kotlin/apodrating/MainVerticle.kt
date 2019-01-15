@@ -2,6 +2,7 @@ package apodrating
 
 import apodrating.model.deploymentOptionsFromEnv
 import io.reactivex.Single
+import io.reactivex.schedulers.Schedulers
 import io.vertx.reactivex.core.AbstractVerticle
 import mu.KLogging
 
@@ -21,7 +22,7 @@ class MainVerticle : AbstractVerticle() {
             verticles
                 .filter { it is String }
                 .map { it as String }
-        }
+        }.subscribeOn(Schedulers.computation())
             .subscribe({ verticles ->
                 logger.info { "Started MainVerticle with ${verticles.size} depending verticles: $verticles" }
             }) {

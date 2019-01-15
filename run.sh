@@ -5,5 +5,4 @@ JAVA_VERSION_COMMAND="$JAVA_HOME/bin/java -version 2>&1 | head -n 1 | awk -F '\"
 eval $JAVA_VERSION_COMMAND
 
 $JAVA_HOME/bin/java -jar target/application.jar \
-  -D exec.mainClass="apodrating.MainKt" \
-  -D exec.args="run apodrating.ApodRatingVerticleKt"
+  -D exec.mainClass="apodrating.MainKt"
