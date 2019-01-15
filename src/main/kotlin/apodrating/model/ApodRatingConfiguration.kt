@@ -1,4 +1,4 @@
-package apodrating
+package apodrating.model
 
 import io.vertx.config.ConfigRetrieverOptions
 import io.vertx.core.DeploymentOptions
@@ -26,6 +26,9 @@ data class ApodRatingConfiguration(val config: JsonObject) {
     }
 }
 
+/**
+ * Convert ConfigRetrieverOptions into DeploymentOptions
+ */
 fun ConfigRetrieverOptions.deploymentOptions(vertx: Vertx): DeploymentOptions =
     DeploymentOptions(
         JsonObject().put(

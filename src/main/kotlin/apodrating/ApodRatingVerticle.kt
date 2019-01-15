@@ -1,11 +1,12 @@
 package apodrating
 
 import apodrating.model.Apod
+import apodrating.model.ApodRatingConfiguration
 import apodrating.model.ApodRequest
 import apodrating.model.Error
 import apodrating.model.Rating
 import apodrating.model.RatingRequest
-import apodrating.model.emptyApod
+import apodrating.model.apodQueryParameters
 import apodrating.model.isEmpty
 import apodrating.model.toJsonString
 import io.reactivex.Single
@@ -15,7 +16,6 @@ import io.vertx.core.Handler
 import io.vertx.core.http.HttpServerOptions
 import io.vertx.core.json.JsonObject
 import io.vertx.ext.jdbc.JDBCClient
-import io.vertx.kotlin.circuitbreaker.CircuitBreakerOptions
 import io.vertx.kotlin.core.json.JsonArray
 import io.vertx.kotlin.core.json.array
 import io.vertx.kotlin.core.json.get
@@ -27,24 +27,15 @@ import io.vertx.kotlin.ext.sql.getConnectionAwait
 import io.vertx.kotlin.ext.sql.queryAwait
 import io.vertx.kotlin.ext.sql.queryWithParamsAwait
 import io.vertx.kotlin.ext.sql.updateWithParamsAwait
-import io.vertx.reactivex.circuitbreaker.CircuitBreaker
 import io.vertx.reactivex.core.Vertx
 import io.vertx.reactivex.core.http.HttpServer
 import io.vertx.reactivex.core.http.HttpServerRequest
 import io.vertx.reactivex.ext.web.RoutingContext
 import io.vertx.reactivex.ext.web.api.contract.openapi3.OpenAPI3RouterFactory
-import io.vertx.reactivex.ext.web.client.WebClient
-import io.vertx.reactivex.ext.web.client.predicate.ResponsePredicate
-import io.vertx.reactivex.ext.web.codec.BodyCodec
 import io.vertx.reactivex.ext.web.handler.StaticHandler
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import mu.KLogging
-import org.ehcache.Cache
-import org.ehcache.config.builders.CacheConfigurationBuilder
-import org.ehcache.config.builders.CacheManagerBuilder
-import org.ehcache.config.builders.ResourcePoolsBuilder
-import java.util.concurrent.atomic.AtomicInteger
 
 class ApodRatingVerticle : CoroutineVerticle() {
 
@@ -52,10 +43,7 @@ class ApodRatingVerticle : CoroutineVerticle() {
 
     private lateinit var client: JDBCClient
     private lateinit var apiKey: String
-    private lateinit var apodCache: Cache<String, Apod>
     private lateinit var rxVertx: Vertx
-    private lateinit var circuitBreaker: CircuitBreaker
-    private lateinit var webClient: WebClient
 
     /**
      * - Start the verticle.
@@ -75,44 +63,6 @@ class ApodRatingVerticle : CoroutineVerticle() {
         val apodConfig = ApodRatingConfiguration(config)
         client = JDBCClient.createShared(vertx, apodConfig.toJsonObject())
         apiKey = apodConfig.nasaApiKey
-
-        launch {
-            CacheManagerBuilder.newCacheManagerBuilder()
-                .withCache(
-                    "apodCache",
-                    CacheConfigurationBuilder
-                        .newCacheConfigurationBuilder(
-                            String::class.java,
-                            Apod::class.java,
-                            ResourcePoolsBuilder.heap(10)
-                        )
-                ).build()
-                .apply {
-                    this.init()
-                    apodCache = this.getCache(
-                        "apodCache",
-                        String::class.java,
-                        Apod::class.java
-                    )
-                }
-        }.join()
-
-        launch {
-            circuitBreaker = CircuitBreaker.create(
-                "apod-circuit-breaker", rxVertx,
-                CircuitBreakerOptions(
-                    maxFailures = 3, // number of failures before opening the circuit
-                    timeout = 2000L, // consider a failure if the operation does not succeed in time
-                    fallbackOnFailure = true, // do we call the fallback on failure
-                    resetTimeout = 1000, // time spent in open state before attempting to re-try
-                    maxRetries = 3 // the number of times the circuit breaker tries to redo the operation before failing
-                )
-            )
-        }.join()
-
-        launch {
-            webClient = WebClient.create(rxVertx)
-        }.join()
 
         // Populate database
         val statements = listOf(
@@ -148,7 +98,8 @@ class ApodRatingVerticle : CoroutineVerticle() {
 
         Single.zip<HttpServer, List<Int>>(listOf(http11Server, http2Server)) { servers ->
             servers
-                .map { eachServer -> eachServer as HttpServer }
+                .filter { it is HttpServer }
+                .map { it as HttpServer }
                 .map { eachHttpServer ->
                     logger.info { "port: ${eachHttpServer.actualPort()}" }
                     eachHttpServer.actualPort()
@@ -208,7 +159,9 @@ class ApodRatingVerticle : CoroutineVerticle() {
                     "INSERT INTO APOD (DATE_STRING) VALUES ?",
                     json { array(apodRequest.dateString) })
                 val newId = updateResult.keys.get<Int>(0)
-                performApodQuery(newId.toString(), apodRequest.dateString, apiKeyHeader)
+                rxVertx.eventBus().rxSend<JsonObject>(
+                    "apodQuery", apodQueryParameters(newId.toString(), apodRequest.dateString, apiKeyHeader)
+                ).map { Apod(it.body()) }
                     .subscribe({
                         ctx.response().setStatusCode(201)
                             .putHeader("Location", "/apod/$newId")
@@ -240,16 +193,20 @@ class ApodRatingVerticle : CoroutineVerticle() {
             val singleApods = this
                 .map {
                     runBlocking {
-                        performApodQuery(
-                            it.getInteger("ID").toString(),
-                            it.getString("DATE_STRING"),
-                            apiKeyHeader
-                        )
+                        rxVertx.eventBus().rxSend<JsonObject>(
+                            "apodQuery",
+                            apodQueryParameters(
+                                it.getInteger("ID").toString(),
+                                it.getString("DATE_STRING"),
+                                apiKeyHeader
+                            )
+                        ).map { msg -> Apod(msg.body()) }
                     }
                 }
                 .toList()
             Single.zip<Apod, List<Apod>>(singleApods) { emittedApodsAsJsonArray ->
                 emittedApodsAsJsonArray
+                    .filter { it is Apod }
                     .map { it as Apod }
                     .filter { !it.isEmpty() }
             }.subscribeOn(Schedulers.io())
@@ -267,10 +224,12 @@ class ApodRatingVerticle : CoroutineVerticle() {
         val apodId = ctx.pathParam("apodId")
         val apiKeyHeader = ctx.request().getHeader("X-API-KEY")
         val result = client.queryWithParamsAwait("SELECT ID, DATE_STRING FROM APOD WHERE ID=?", json { array(apodId) })
-
         when (result.rows.size) {
             1 -> result.rows[0]?.apply {
-                performApodQuery(this.getInteger("ID").toString(), this.getString("DATE_STRING"), apiKeyHeader)
+                rxVertx.eventBus().rxSend<JsonObject>(
+                    "apodQuery",
+                    apodQueryParameters(this.getInteger("ID").toString(), this.getString("DATE_STRING"), apiKeyHeader)
+                ).map { Apod(it.body()) }
                     .subscribe({
                         when {
                             it == null || it.isEmpty() -> ctx.response().setStatusCode(503).end()
@@ -285,60 +244,6 @@ class ApodRatingVerticle : CoroutineVerticle() {
             else -> ctx.response().setStatusCode(400).end()
         }
     }
-
-    /**
-     * Perform a query against the NASA api
-     *
-     *  @param date the date string
-     *  @param nasaApiKey the api key provided by the client
-     */
-    private fun performApodQuery(
-        id: String,
-        date: String,
-        nasaApiKey: String
-    ): Single<Apod> = when {
-        apodCache.containsKey(date) -> Single.just(apodCache.get(date)).doOnSuccess { logger.info { "cache hit: $id" } }
-        else -> {
-            val counter = AtomicInteger()
-            circuitBreaker.rxExecuteCommandWithFallback<Apod>({ future ->
-                if (counter.getAndIncrement() > 0) logger.info { "number of retries: ${counter.get() - 1}" }
-                createApodWebClient(date, nasaApiKey, id)
-                    .subscribe({ future.complete(it) }) { future.fail(it) }
-            }) {
-                logger.error { "Circuit opened. Error: $it - message: ${it.message}" }
-                emptyApod()
-            }
-        }
-    }
-
-    /**
-     * Create a web client instance for querying the NASA api.
-     *
-     * @param date the date String
-     * @param nasaApiKey  the NASA api key
-     * @param id the apod id
-     */
-    private fun createApodWebClient(
-        date: String,
-        nasaApiKey: String,
-        id: String
-    ): Single<Apod> = webClient.getAbs("https://api.nasa.gov")
-        .uri("/planetary/apod")
-        .addQueryParam("date", date)
-        .addQueryParam("api_key", nasaApiKey)
-        .addQueryParam("hd", true.toString())
-        .expect(ResponsePredicate.SC_SUCCESS)
-        .expect(ResponsePredicate.JSON)
-        .`as`(BodyCodec.jsonObject())
-        .rxSend()
-        .map { it.body() }
-        .map { Apod(id, it) }
-        .doOnSuccess {
-            if (!apodCache.containsKey(date)) {
-                apodCache.put(date, it)
-                logger.info { "added entry to cache: ${it.id}" }
-            }
-        }
 
     /**
      * Serve a POST request. Rate an apod

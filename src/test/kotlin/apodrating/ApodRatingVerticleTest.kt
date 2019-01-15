@@ -1,5 +1,6 @@
 package apodrating
 
+import io.reactivex.Single
 import io.vertx.core.DeploymentOptions
 import io.vertx.core.json.JsonObject
 import io.vertx.junit5.VertxExtension
@@ -17,12 +18,18 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 
+/**
+ * Unit test for ApodRatingVerticle
+ */
 @DisplayName("👋 A fairly basic test example")
 @ExtendWith(VertxExtension::class)
 class ApodRatingVerticleTest {
 
     companion object : KLogging()
 
+    /**
+     * Prepare test by deploying the verticle.
+     */
     @BeforeEach
     @DisplayName("Deploy verticle ")
     fun deployVerticle(vertx: Vertx, testContext: VertxTestContext) {
@@ -40,16 +47,31 @@ class ApodRatingVerticleTest {
             )
             .configStream()
             .handler { config ->
-                vertx.rxDeployVerticle(
-                    "apodrating.ApodRatingVerticle",
-                    DeploymentOptions(JsonObject().put("config", config))
-                )
+                Single.zip<String, List<String>>(
+                    listOf(
+                        vertx.rxDeployVerticle(
+                            ApodRatingVerticle(),
+                            DeploymentOptions(JsonObject().put("config", config))
+                        ),
+                        vertx.rxDeployVerticle(
+                            ApodRemoteProxyVerticle(),
+                            DeploymentOptions(JsonObject().put("config", config))
+                        )
+                    )
+                ) { verticles ->
+                    verticles
+                        .filter { it is String }
+                        .map { it as String }
+                }
                     .subscribe({ _ ->
                         testContext.completeNow()
                     }) { error -> logger.error { error } }
             }
     }
 
+    /**
+     * Perform test.
+     */
     @DisplayName("Get Rating")
     @Test
     fun getApod(vertx: Vertx, testContext: VertxTestContext) {
@@ -69,6 +91,9 @@ class ApodRatingVerticleTest {
             }
     }
 
+    /**
+     * Undeply Verticle.
+     */
     @AfterEach
     @DisplayName("Undeploy verticle ")
     fun undeployVerticle(vertx: Vertx) {
