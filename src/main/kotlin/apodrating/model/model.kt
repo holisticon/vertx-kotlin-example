@@ -1,10 +1,14 @@
 package apodrating.model
 
+import io.vertx.core.DeploymentOptions
 import io.vertx.core.json.JsonObject
 import io.vertx.ext.sql.ResultSet
+import io.vertx.kotlin.config.ConfigRetrieverOptions
+import io.vertx.kotlin.config.ConfigStoreOptions
 import io.vertx.kotlin.core.json.get
 import io.vertx.kotlin.core.json.json
 import io.vertx.kotlin.core.json.obj
+import io.vertx.reactivex.core.Vertx
 
 /**
  * Convert this Apod into a JsonObject.
@@ -24,6 +28,16 @@ fun Apod(id: String, jsonObject: JsonObject): Apod = Apod(
     dateString = jsonObject.getString("date"),
     title = jsonObject.getString("title"),
     imageUriHd = jsonObject.getString("hdurl")
+)
+
+/**
+ * Create a new Apod from a JsonObject.
+ */
+fun Apod(jsonObject: JsonObject): Apod = Apod(
+    id = jsonObject.getString("id"),
+    dateString = jsonObject.getString("dateString"),
+    title = jsonObject.getString("title"),
+    imageUriHd = jsonObject.getString("imageUriHd")
 )
 
 /**
@@ -78,3 +92,18 @@ fun Error.toJsonObject(): JsonObject = JsonObject.mapFrom(this)
  * Error this Rating into a String encoded JsonObject.
  */
 fun Error.toJsonString(): String = this.toJsonObject().encode()
+
+/**
+ * Get deployment options configured by environment variables.
+ */
+fun deploymentOptionsFromEnv(vertx: Vertx): DeploymentOptions = ConfigRetrieverOptions(
+    scanPeriod = 2000,
+    stores = listOf(ConfigStoreOptions(type = "env"))
+).deploymentOptions(vertx)
+
+/**
+ * Get a JsonObject for an apod query that is going to be sent over the eventbus.
+ */
+fun apodQueryParameters(id: String, date: String, apiKey: String) = JsonObject().put("id", id)
+    .put("date", date)
+    .put("nasaApiKey", apiKey)

@@ -1,5 +1,6 @@
 package apodrating
 
+import io.reactivex.Single
 import io.vertx.core.DeploymentOptions
 import io.vertx.core.json.JsonObject
 import io.vertx.junit5.VertxExtension
@@ -46,10 +47,22 @@ class ApodRatingVerticleTest {
             )
             .configStream()
             .handler { config ->
-                vertx.rxDeployVerticle(
-                    "apodrating.ApodRatingVerticle",
-                    DeploymentOptions(JsonObject().put("config", config))
-                )
+                Single.zip<String, List<String>>(
+                    listOf(
+                        vertx.rxDeployVerticle(
+                            ApodRatingVerticle(),
+                            DeploymentOptions(JsonObject().put("config", config))
+                        ),
+                        vertx.rxDeployVerticle(
+                            ApodRemoteProxyVerticle(),
+                            DeploymentOptions(JsonObject().put("config", config))
+                        )
+                    )
+                ) { verticles ->
+                    verticles
+                        .filter { it is String }
+                        .map { it as String }
+                }
                     .subscribe({ _ ->
                         testContext.completeNow()
                     }) { error -> logger.error { error } }

@@ -1,4 +1,4 @@
-package apodrating
+package apodrating.model
 
 import io.vertx.config.ConfigRetrieverOptions
 import io.vertx.core.DeploymentOptions
