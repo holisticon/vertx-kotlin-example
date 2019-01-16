@@ -36,7 +36,11 @@ import io.vertx.reactivex.ext.web.handler.StaticHandler
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import mu.KLogging
+import org.apache.http.HttpStatus
 
+/**
+ * Implements our REST interface
+ */
 class ApodRatingVerticle : CoroutineVerticle() {
 
     companion object : KLogging()
@@ -59,7 +63,6 @@ class ApodRatingVerticle : CoroutineVerticle() {
     }
 
     private suspend fun startUp(startFuture: Future<Void>?) {
-        val startupTime = System.currentTimeMillis()
         val apodConfig = ApodRatingConfiguration(config)
         client = JDBCClient.createShared(vertx, apodConfig.toJsonObject())
         apiKey = apodConfig.nasaApiKey
@@ -106,7 +109,7 @@ class ApodRatingVerticle : CoroutineVerticle() {
                 }
         }.doOnSuccess { startFuture?.complete() }
             .subscribeOn(Schedulers.io())
-            .subscribe({ logger.info { "started ${it.size} servers in ${System.currentTimeMillis() - startupTime}ms" } })
+            .subscribe({ logger.info { "started ${it.size} servers" } })
             { logger.error { it } }
     }
 
@@ -125,8 +128,11 @@ class ApodRatingVerticle : CoroutineVerticle() {
      */
     private fun createRouter(routerFactory: OpenAPI3RouterFactory): Handler<HttpServerRequest> =
         routerFactory.apply {
-            coroutineHandler("putRating") { handlePutApod(it) }
+            coroutineHandler("putRating") { checkApodIdValid(it) }
+            coroutineHandler("putRating") { handlePutApodRating(it) }
+            coroutineHandler("getRating") { checkApodIdValid(it) }
             coroutineHandler("getRating") { handleGetRating(it) }
+            coroutineHandler("getApodForDate") { checkApodIdValid(it) }
             coroutineHandler("getApodForDate") { handleGetApodForDate(it) }
             coroutineHandler("getApods") { handleGetApods(it) }
             coroutineHandler("postApod") { handlePostApod(it) }
@@ -140,8 +146,27 @@ class ApodRatingVerticle : CoroutineVerticle() {
      */
     private fun handleApiKeyValidation(ctx: RoutingContext) = when (apiKey) {
         ctx.request().getHeader("X-API-KEY") -> ctx.next()
-        else -> ctx.response().setStatusCode(401).end(Error(401, "Api key not valid").toJsonString())
+        else -> ctx.response().setStatusCode(HttpStatus.SC_UNAUTHORIZED).end(
+            Error(
+                HttpStatus.SC_UNAUTHORIZED,
+                "Api key not valid"
+            ).toJsonString()
+        )
     }
+
+    /**
+     * Check if the apodId is an integer
+     */
+    private fun checkApodIdValid(ctx: RoutingContext) =
+        when {
+            ctx.pathParam("apodId").toIntOrNull() != null -> ctx.next()
+            else -> ctx.response().setStatusCode(HttpStatus.SC_BAD_REQUEST).end(
+                Error(
+                    HttpStatus.SC_BAD_REQUEST,
+                    "path parameter must be an integer, e.g. /apod/42"
+                ).toJsonString()
+            )
+        }
 
     /**
      * Handle a POST request for a single APOD identified by a date string.
@@ -163,15 +188,25 @@ class ApodRatingVerticle : CoroutineVerticle() {
                     "apodQuery", apodQueryParameters(newId.toString(), apodRequest.dateString, apiKeyHeader)
                 ).map { Apod(it.body()) }
                     .subscribe({
-                        ctx.response().setStatusCode(201)
+                        ctx.response().setStatusCode(HttpStatus.SC_CREATED)
                             .putHeader("Location", "/apod/$newId")
                             .end()
-                    }) { error ->
-                        ctx.response().setStatusCode(500)
-                            .end(Error(500, "Could not create apod entry. ${error.message}").toJsonString())
+                    }) {
+                        ctx.response().setStatusCode(HttpStatus.SC_INTERNAL_SERVER_ERROR)
+                            .end(
+                                Error(
+                                    HttpStatus.SC_INTERNAL_SERVER_ERROR,
+                                    "Could not create apod entry. ${it.message}"
+                                ).toJsonString()
+                            )
                     }
             }
-            else -> ctx.response().setStatusCode(409).end(Error(409, "Entry already exists").toJsonString())
+            else -> ctx.response().setStatusCode(HttpStatus.SC_CONFLICT).end(
+                Error(
+                    HttpStatus.SC_CONFLICT,
+                    "Entry already exists"
+                ).toJsonString()
+            )
         }
     }
 
@@ -186,8 +221,8 @@ class ApodRatingVerticle : CoroutineVerticle() {
         var apods: List<JsonObject>? = null
         when {
             result.rows.size > 0 -> apods = result.rows
-            result.rows.size == 0 -> ctx.response().setStatusCode(200).end(JsonArray().encode())
-            else -> ctx.response().setStatusCode(400).end()
+            result.rows.size == 0 -> ctx.response().setStatusCode(HttpStatus.SC_OK).end(JsonArray().encode())
+            else -> ctx.response().setStatusCode(HttpStatus.SC_INTERNAL_SERVER_ERROR).end()
         }
         apods?.apply {
             val singleApods = this
@@ -210,8 +245,11 @@ class ApodRatingVerticle : CoroutineVerticle() {
                     .map { it as Apod }
                     .filter { !it.isEmpty() }
             }.subscribeOn(Schedulers.io())
-                .subscribe({ ctx.response().setStatusCode(200).end(JsonArray(it).encode()) })
-                { ctx.response().setStatusCode(500).end(Error(500, "${it.message}").toJsonString()) }
+                .subscribe({ ctx.response().setStatusCode(HttpStatus.SC_OK).end(JsonArray(it).encode()) })
+                {
+                    ctx.response().setStatusCode(HttpStatus.SC_INTERNAL_SERVER_ERROR)
+                        .end(Error(HttpStatus.SC_INTERNAL_SERVER_ERROR, "${it.message}").toJsonString())
+                }
         }
     }
 
@@ -232,16 +270,16 @@ class ApodRatingVerticle : CoroutineVerticle() {
                 ).map { Apod(it.body()) }
                     .subscribe({
                         when {
-                            it == null || it.isEmpty() -> ctx.response().setStatusCode(503).end()
-                            else -> ctx.response().setStatusCode(200).end(it.toJsonString())
+                            it == null || it.isEmpty() -> ctx.response().setStatusCode(HttpStatus.SC_SERVICE_UNAVAILABLE).end()
+                            else -> ctx.response().setStatusCode(HttpStatus.SC_OK).end(it.toJsonString())
                         }
                     }) {
                         logger.error { it }
-                        ctx.response().setStatusCode(500).end()
+                        ctx.response().setStatusCode(HttpStatus.SC_INTERNAL_SERVER_ERROR).end()
                     }
             }
-            0 -> ctx.response().setStatusCode(404).end()
-            else -> ctx.response().setStatusCode(400).end()
+            0 -> ctx.response().setStatusCode(HttpStatus.SC_NOT_FOUND).end()
+            else -> ctx.response().setStatusCode(HttpStatus.SC_BAD_REQUEST).end()
         }
     }
 
@@ -250,18 +288,33 @@ class ApodRatingVerticle : CoroutineVerticle() {
      *
      * @param ctx the vertx RoutingContext
      */
-    private suspend fun handlePutApod(ctx: RoutingContext) {
+    private suspend fun handlePutApodRating(ctx: RoutingContext) {
         val apod = ctx.pathParam("apodId")
         val rating = RatingRequest(ctx.bodyAsJson)
-        val result = client.queryWithParamsAwait("SELECT ID FROM APOD WHERE ID=?", json { array(apod) })
         when {
-            result.rows.size == 1 -> {
-                client.updateWithParamsAwait(
-                    "INSERT INTO RATING (VALUE, APOD_ID) VALUES ?, ?",
-                    json { array(rating.rating, apod) })
-                ctx.response().setStatusCode(204).end()
+            rating.rating in 1..10 -> {
+                val result = client.queryWithParamsAwait("SELECT ID FROM APOD WHERE ID=?", json { array(apod) })
+                when {
+                    result.rows.size == 1 -> {
+                        client.updateWithParamsAwait(
+                            "INSERT INTO RATING (VALUE, APOD_ID) VALUES ?, ?",
+                            json { array(rating.rating, apod) })
+                        ctx.response().setStatusCode(HttpStatus.SC_NO_CONTENT).end()
+                    }
+                    else -> ctx.response().setStatusCode(HttpStatus.SC_NOT_FOUND).end(
+                        Error(
+                            HttpStatus.SC_NOT_FOUND,
+                            "Apod does not exist."
+                        ).toJsonString()
+                    )
+                }
             }
-            else -> ctx.response().setStatusCode(404).end(Error(404, "Apod does not exist.").toJsonString())
+            else -> ctx.response().setStatusCode(HttpStatus.SC_BAD_REQUEST).end(
+                Error(
+                    HttpStatus.SC_BAD_REQUEST,
+                    "Rating must be an integer between 1 and 10"
+                ).toJsonString()
+            )
         }
     }
 
@@ -277,13 +330,18 @@ class ApodRatingVerticle : CoroutineVerticle() {
             json { array(apod) })
         when (result.rows.size) {
             1 -> ctx.response().end(Rating(result).toJsonString())
-            0 -> ctx.response().setStatusCode(404).end(
+            0 -> ctx.response().setStatusCode(HttpStatus.SC_NOT_FOUND).end(
                 Error(
-                    404,
+                    HttpStatus.SC_NOT_FOUND,
                     "A rating for this Apod entry does not exist"
                 ).toJsonString()
             )
-            else -> ctx.response().setStatusCode(500).end(Error(500, "Server error").toJsonString())
+            else -> ctx.response().setStatusCode(HttpStatus.SC_INTERNAL_SERVER_ERROR).end(
+                Error(
+                    HttpStatus.SC_INTERNAL_SERVER_ERROR,
+                    "Server error"
+                ).toJsonString()
+            )
         }
     }
 

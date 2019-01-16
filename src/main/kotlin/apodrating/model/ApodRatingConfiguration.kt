@@ -8,6 +8,9 @@ import io.vertx.kotlin.core.json.obj
 import io.vertx.reactivex.config.ConfigRetriever
 import io.vertx.reactivex.core.Vertx
 
+/**
+ * Holds the configurtion of our application.
+ */
 data class ApodRatingConfiguration(val config: JsonObject) {
 
     val port: Int = config.getInteger("APODRATING_PORT", 8080)
