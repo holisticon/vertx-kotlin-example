@@ -63,7 +63,7 @@ class ApodRatingVerticleTest {
                         .filter { it is String }
                         .map { it as String }
                 }
-                    .subscribe({ _ ->
+                    .subscribe({
                         testContext.completeNow()
                     }) { error -> logger.error { error } }
             }
@@ -72,7 +72,7 @@ class ApodRatingVerticleTest {
     /**
      * Perform test.
      */
-    @DisplayName("Get Rating")
+    @DisplayName("Get asRating")
     @Test
     fun getApod(vertx: Vertx, testContext: VertxTestContext) {
         val client = WebClient.create(vertx)

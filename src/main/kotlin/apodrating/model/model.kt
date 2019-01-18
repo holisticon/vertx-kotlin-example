@@ -1,3 +1,5 @@
+@file:Suppress("TooManyFunctions")
+
 package apodrating.model
 
 import io.vertx.core.DeploymentOptions
@@ -11,19 +13,19 @@ import io.vertx.kotlin.core.json.obj
 import io.vertx.reactivex.core.Vertx
 
 /**
- * Convert this Apod into a JsonObject.
+ * Convert this asApod into a JsonObject.
  */
 fun Apod.toJsonObject(): JsonObject = JsonObject.mapFrom(this)
 
 /**
- * Convert this Apod into a String encoded JsonObject.
+ * Convert this asApod into a String encoded JsonObject.
  */
 fun Apod.toJsonString(): String = this.toJsonObject().encode()
 
 /**
- * Create a new Apod from an ID String and a JsonObject.
+ * Create a new asApod from an ID String and a JsonObject.
  */
-fun Apod(id: String, jsonObject: JsonObject): Apod = Apod(
+fun asApod(id: String, jsonObject: JsonObject): Apod = Apod(
     id = id,
     dateString = jsonObject.getString("date"),
     title = jsonObject.getString("title"),
@@ -31,9 +33,9 @@ fun Apod(id: String, jsonObject: JsonObject): Apod = Apod(
 )
 
 /**
- * Create a new Apod from a JsonObject.
+ * Create a new asApod from a JsonObject.
  */
-fun Apod(jsonObject: JsonObject): Apod = Apod(
+fun asApod(jsonObject: JsonObject): Apod = Apod(
     id = jsonObject.getString("id"),
     dateString = jsonObject.getString("dateString"),
     title = jsonObject.getString("title"),
@@ -41,47 +43,47 @@ fun Apod(jsonObject: JsonObject): Apod = Apod(
 )
 
 /**
- * Return an empty Apod object.
+ * Return an empty asApod object.
  */
 fun emptyApod(): Apod = Apod(id = "", title = "", dateString = "", imageUriHd = "")
 
 /**
- * Return true if this is an empty Apod.
+ * Return true if this is an empty asApod.
  */
 fun Apod.isEmpty() = this == emptyApod()
 
 /**
- * Create an ApodRequest from a JsonObject
+ * Create an asApodRequest from a JsonObject
  */
-fun ApodRequest(jsonObject: JsonObject): ApodRequest = ApodRequest(dateString = jsonObject.getString("dateString"))
+fun asApodRequest(jsonObject: JsonObject): ApodRequest = ApodRequest(dateString = jsonObject.getString("dateString"))
 
 /**
- * Convert this Rating into a JsonObject.
+ * Convert this asRating into a JsonObject.
  */
 fun Rating.toJsonObject(): JsonObject = JsonObject.mapFrom(this)
 
 /**
- * Convert this Rating into a String encoded JsonObject.
+ * Convert this asRating into a String encoded JsonObject.
  */
 fun Rating.toJsonString(): String = this.toJsonObject().encode()
 
 /**
- * Create a Rating from a JsonObject
+ * Create a asRating from a JsonObject
  */
-fun Rating(jsonObject: JsonObject): Rating =
+fun asRating(jsonObject: JsonObject): Rating =
     Rating(id = jsonObject.getInteger("id"), rating = jsonObject.getInteger("rating"))
 
 /**
- * Create a Rating from a ResultSet
+ * Create a asRating from a ResultSet
  */
-fun Rating(result: ResultSet): Rating = Rating(json {
+fun asRating(result: ResultSet): Rating = asRating(json {
     obj("id" to result.rows[0]["APOD_ID"], "rating" to result.rows[0]["VALUE"])
 })
 
 /**
- * Create a RatingRequest from a JsonObject
+ * Create a asRatingRequest from a JsonObject
  */
-fun RatingRequest(jsonObject: JsonObject): RatingRequest = RatingRequest(rating = jsonObject.getInteger("rating"))
+fun asRatingRequest(jsonObject: JsonObject): RatingRequest = RatingRequest(rating = jsonObject.getInteger("rating"))
 
 /**
  * Convert this Error into a JsonObject.
@@ -89,7 +91,7 @@ fun RatingRequest(jsonObject: JsonObject): RatingRequest = RatingRequest(rating 
 fun Error.toJsonObject(): JsonObject = JsonObject.mapFrom(this)
 
 /**
- * Error this Rating into a String encoded JsonObject.
+ * Error this asRating into a String encoded JsonObject.
  */
 fun Error.toJsonString(): String = this.toJsonObject().encode()
 
@@ -104,6 +106,6 @@ fun deploymentOptionsFromEnv(vertx: Vertx): DeploymentOptions = ConfigRetrieverO
 /**
  * Get a JsonObject for an apod query that is going to be sent over the eventbus.
  */
-fun apodQueryParameters(id: String, date: String, apiKey: String) = JsonObject().put("id", id)
+fun apodQueryParameters(id: String, date: String, apiKey: String): JsonObject = JsonObject().put("id", id)
     .put("date", date)
     .put("nasaApiKey", apiKey)

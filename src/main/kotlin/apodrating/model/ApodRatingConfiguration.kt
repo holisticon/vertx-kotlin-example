@@ -8,14 +8,18 @@ import io.vertx.kotlin.core.json.obj
 import io.vertx.reactivex.config.ConfigRetriever
 import io.vertx.reactivex.core.Vertx
 
-data class ApodRatingConfiguration(val config: JsonObject) {
-
-    val port: Int = config.getInteger("APODRATING_PORT", 8080)
-    val h2Port: Int = config.getInteger("APODRATING_H2_PORT", 8443)
-    val jdbcUrl: String = config.getString("JDBC_URL", "org.hsqldb.jdbcDriver")
-    val jdbcDriver: String = config.getString("JDBC_DRIVER", "org.hsqldb.jdbcDriver")
-    val jdbcPoolSize: Int = config.getInteger("JDBC_MAX_POOL_SIZE", 30)
+/**
+ * Holds the configurtion of our application.
+ */
+data class ApodRatingConfiguration(
+    val config: JsonObject,
+    val port: Int = config.getInteger("APODRATING_PORT", 8080),
+    val h2Port: Int = config.getInteger("APODRATING_H2_PORT", 8443),
+    val jdbcUrl: String = config.getString("JDBC_URL", "org.hsqldb.jdbcDriver"),
+    val jdbcDriver: String = config.getString("JDBC_DRIVER", "org.hsqldb.jdbcDriver"),
+    val jdbcPoolSize: Int = config.getInteger("JDBC_MAX_POOL_SIZE", 30),
     var nasaApiKey: String = config.getString("NASA_API_KEY")
+) {
 
     fun toJsonObject() = json {
         obj(

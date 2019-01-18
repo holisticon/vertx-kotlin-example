@@ -25,8 +25,23 @@ paths:
       responses:
         '201':
           description: Apod entry created
+          headers:
+            location:
+              schema:
+                type: string
+              description: The location of the created resource.
         '409':
           description: Apod entry already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Apod entry could not be created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
     get:
       summary: get all apods
       operationId: getApods
@@ -36,15 +51,19 @@ paths:
         - apodrating
       responses:
         '200':
-          description: the picture's title and hd uri
+          description: An array of apods or an empty array, if no data is available.
           content:
             application/json:
               schema:
                 type: array
                 items:
                   $ref: '#/components/schemas/Apod'
-        '404':
-          description: the requested apod could not be found
+        '500':
+          description: the request could not be completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         default:
           description: unexpected error
           content:
@@ -74,8 +93,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Apod'
+        '400':
+          description: the last segement of the request path is not an integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '404':
           description: the requested apod could not be found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         default:
           description: unexpected error
           content:
@@ -102,8 +131,24 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Rating'
+        '400':
+          description: the last segement of the request path is not an integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '404':
-          description: the requested apod could not be found
+          description: A rating for this Apod entry does not exist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Request could not be completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         default:
           description: unexpected error
           content:
@@ -133,8 +178,23 @@ paths:
         '204':
           description: Rating changed
         '400':
-          description: Invalid request
-
+          description: the last segement of the request path is not an integer or an invalid rating value was supplied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Apod entry does not exist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 components:
   securitySchemes:
     ApiKeyAuth:        # arbitrary name for the security scheme

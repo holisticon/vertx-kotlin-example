@@ -1,7 +1,7 @@
 package apodrating
 
 import apodrating.model.Apod
-import apodrating.model.ApodRatingConfiguration
+import apodrating.model.asApod
 import apodrating.model.emptyApod
 import apodrating.model.isEmpty
 import apodrating.model.toJsonObject
@@ -49,7 +49,6 @@ class ApodRemoteProxyVerticle : CoroutineVerticle() {
     }
 
     private suspend fun startUp(startFuture: Future<Void>?) {
-        val apodConfig = ApodRatingConfiguration(config)
         launch {
             CacheManagerBuilder.newCacheManagerBuilder()
                 .withCache(
@@ -70,6 +69,7 @@ class ApodRemoteProxyVerticle : CoroutineVerticle() {
                     )
                 }
         }.join()
+
         launch {
             circuitBreaker = CircuitBreaker.create(
                 "apod-circuit-breaker", rxVertx,
@@ -152,7 +152,7 @@ class ApodRemoteProxyVerticle : CoroutineVerticle() {
         .`as`(BodyCodec.jsonObject())
         .rxSend()
         .map { it.body() }
-        .map { Apod(id, it) }
+        .map { asApod(id, it) }
         .doOnSuccess {
             if (!apodCache.containsKey(date)) {
                 apodCache.put(date, it)
