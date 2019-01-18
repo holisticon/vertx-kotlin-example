@@ -51,19 +51,13 @@ paths:
         - apodrating
       responses:
         '200':
-          description: the picture's title and hd uri
+          description: An array of apods or an empty array, if no data is available.
           content:
             application/json:
               schema:
                 type: array
                 items:
                   $ref: '#/components/schemas/Apod'
-        '404':
-          description: the requested apod could not be found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
         '500':
           description: the request could not be completed
           content:

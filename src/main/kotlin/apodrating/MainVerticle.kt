@@ -28,7 +28,10 @@ class MainVerticle : AbstractVerticle() {
                 .map { it as String }
         }.subscribeOn(Schedulers.computation())
             .subscribe({ verticles ->
-                logger.info { "Started MainVerticle with ${verticles.size} child verticles: $verticles in ${System.currentTimeMillis() - startupTime}ms" }
+                logger.info {
+                    "Started MainVerticle with ${verticles.size} child " +
+                        "verticles: $verticles in ${System.currentTimeMillis() - startupTime}ms"
+                }
             }) {
                 logger.error { it }
             }

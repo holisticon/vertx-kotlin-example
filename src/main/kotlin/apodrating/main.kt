@@ -2,9 +2,6 @@ package apodrating
 
 import apodrating.model.deploymentOptionsFromEnv
 import io.vertx.reactivex.core.Vertx
-import mu.KotlinLogging
-
-private val logger = KotlinLogging.logger {}
 
 /**
  * Start our application.
