@@ -121,12 +121,13 @@ class ApodRatingVerticle : CoroutineVerticle() {
             coroutineHandler("getRating") { handleGetRating(it) }
 
             coroutineHandler("getApodForDate") { checkApodIdValid(it) }
+            coroutineHandler("getApodForDate") { prepareHandleGetApodForDate(it) }
             coroutineHandler("getApodForDate") { handleGetApodForDate(it) }
 
             coroutineHandler("getApods") { handleGetApods(it) }
 
             coroutineHandler("postApod") { handlePostApod(it) }
-            
+
             coroutineSecurityHandler("ApiKeyAuth") { handleApiKeyValidation(it, apiKey) }
         }.router.apply {
             route("/ui/*").handler(StaticHandler.create())
@@ -218,37 +219,47 @@ class ApodRatingVerticle : CoroutineVerticle() {
     }
 
     /**
+     * Check if the apod exists. If it does, store it in the context and let the next handler do the subsequent
+     * processing.
+     *
+     * If it does not exists or the request is somewhat erroneous, end the request here with the proper status code.
+     */
+    private suspend fun prepareHandleGetApodForDate(ctx: RoutingContext) {
+        val apodId = ctx.pathParam("apodId")
+        val result =
+            client.queryWithParamsAwait("SELECT ID, DATE_STRING FROM APOD WHERE ID=?", json { array(apodId) })
+        when (result.rows.size) {
+            1 -> ctx.put("apodFromDB", result.rows[0]).next()
+            0 -> ctx.response().setStatusCode(HttpStatus.SC_NOT_FOUND).end()
+            else -> ctx.response().setStatusCode(HttpStatus.SC_BAD_REQUEST).end()
+        }
+    }
+
+    /**
      * Handle a GET request for a single APOD identified by a date string.
      *
      * @param ctx the vertx routing context
      */
-    private suspend fun handleGetApodForDate(ctx: RoutingContext) {
-        val apodId = ctx.pathParam("apodId")
-        val apiKeyHeader = ctx.request().getHeader("X-API-KEY")
-        val result =
-            client.queryWithParamsAwait("SELECT ID, DATE_STRING FROM APOD WHERE ID=?", json { array(apodId) })
-        when (result.rows.size) {
-            1 -> result.rows[0]?.apply {
-                rxVertx.eventBus().rxSend<JsonObject>(
-                    "apodQuery",
-                    apodQueryParameters(
-                        this.getInteger("ID").toString(),
-                        this.getString("DATE_STRING"),
-                        apiKeyHeader
-                    )
-                ).map { asApod(it.body()) }
-                    .subscribe({
-                        when {
-                            it == null || it.isEmpty() -> ctx.response().setStatusCode(HttpStatus.SC_SERVICE_UNAVAILABLE).end()
-                            else -> ctx.response().setStatusCode(HttpStatus.SC_OK).end(it.toJsonString())
-                        }
-                    }) {
-                        logger.error { it }
-                        ctx.response().setStatusCode(HttpStatus.SC_INTERNAL_SERVER_ERROR).end()
+    private fun handleGetApodForDate(ctx: RoutingContext) {
+        val jsonObject = ctx.get<JsonObject?>("apodFromDB")
+        jsonObject?.apply {
+            rxVertx.eventBus().rxSend<JsonObject>(
+                "apodQuery",
+                apodQueryParameters(
+                    this.getInteger("ID").toString(),
+                    this.getString("DATE_STRING"),
+                    ctx.request().getHeader("X-API-KEY")
+                )
+            ).map { asApod(it.body()) }
+                .subscribe({
+                    when {
+                        it == null || it.isEmpty() -> ctx.response().setStatusCode(HttpStatus.SC_SERVICE_UNAVAILABLE).end()
+                        else -> ctx.response().setStatusCode(HttpStatus.SC_OK).end(it.toJsonString())
                     }
-            }
-            0 -> ctx.response().setStatusCode(HttpStatus.SC_NOT_FOUND).end()
-            else -> ctx.response().setStatusCode(HttpStatus.SC_BAD_REQUEST).end()
+                }) {
+                    logger.error { it }
+                    ctx.response().setStatusCode(HttpStatus.SC_INTERNAL_SERVER_ERROR).end()
+                }
         }
     }
 
@@ -271,7 +282,7 @@ class ApodRatingVerticle : CoroutineVerticle() {
             else -> ctx.response().setStatusCode(HttpStatus.SC_NOT_FOUND).end(
                 Error(
                     HttpStatus.SC_NOT_FOUND,
-                    "asApod does not exist."
+                    "Apod does not exist."
                 ).toJsonString()
             )
         }
