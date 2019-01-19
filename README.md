@@ -1,3 +1,4 @@
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/3afe83587b7b41e8a128306b0724149e)](https://app.codacy.com/app/janweinschenker/vertx-kotlin-example?utm_source=github.com&utm_medium=referral&utm_content=holisticon/vertx-kotlin-example&utm_campaign=Badge_Grade_Dashboard)
 [![Build Status](https://travis-ci.org/holisticon/vertx-kotlin-example.svg?branch=master)](https://travis-ci.org/holisticon/vertx-kotlin-example)
 
 # A microservice example based on Vert.x, Kotlin and OpenAPI 3 
