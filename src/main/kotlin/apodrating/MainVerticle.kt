@@ -22,11 +22,8 @@ class MainVerticle : AbstractVerticle() {
                     deploymentOptionsFromEnv(vertx)
                 )
             )
-        ) { verticles ->
-            verticles
-                .filter { it is String }
-                .map { it as String }
-        }.subscribeOn(Schedulers.computation())
+        ) { it.filterIsInstance<String>() }
+            .subscribeOn(Schedulers.computation())
             .subscribe({ verticles ->
                 logger.info {
                     "Started MainVerticle with ${verticles.size} child " +

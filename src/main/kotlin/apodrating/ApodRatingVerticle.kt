@@ -40,6 +40,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import mu.KLogging
 import org.apache.http.HttpStatus
+import kotlin.contracts.ExperimentalContracts
 
 /**
  * Implements our REST interface
@@ -58,6 +59,7 @@ class ApodRatingVerticle : CoroutineVerticle() {
      * - Initialize vertx router
      * - Initialize webserver
      */
+    @ExperimentalContracts
     override fun start(startFuture: Future<Void>?) {
         launch {
             val apodConfig = ApodRatingConfiguration(config)
@@ -91,10 +93,9 @@ class ApodRatingVerticle : CoroutineVerticle() {
                         .requestHandler(createRouter(it))
                         .listen(apodConfig.h2Port)
                 }
-            Single.zip(listOf(http11Server, http2Server)) { servers ->
-                servers
-                    .filter { it is HttpServer }
-                    .map { it as HttpServer }
+            Single.zip(listOf(http11Server, http2Server)) {
+                it
+                    .filterIsInstance<HttpServer>()
                     .map { eachHttpServer ->
                         logger.info { "port: ${eachHttpServer.actualPort()}" }
                         eachHttpServer.actualPort()
@@ -206,8 +207,7 @@ class ApodRatingVerticle : CoroutineVerticle() {
                 .toList()
             Single.zip<Apod, List<Apod>>(singleApods) { emittedApodsAsJsonArray ->
                 emittedApodsAsJsonArray
-                    .filter { it is Apod }
-                    .map { it as Apod }
+                    .filterIsInstance<Apod>()
                     .filter { !it.isEmpty() }
             }.subscribeOn(Schedulers.io())
                 .subscribe({ ctx.response().setStatusCode(HttpStatus.SC_OK).end(JsonArray(it).encode()) })
