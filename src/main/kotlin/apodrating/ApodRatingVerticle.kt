@@ -112,24 +112,24 @@ class ApodRatingVerticle : CoroutineVerticle() {
      */
     private fun createRouter(routerFactory: OpenAPI3RouterFactory): Handler<HttpServerRequest> =
         routerFactory.apply {
-            coroutineHandler(Constants.OPERATION_PUT_RATING) { checkApodIdValid(it) }
-            coroutineHandler(Constants.OPERATION_PUT_RATING) { checkRatingValue(it) }
-            coroutineHandler(Constants.OPERATION_PUT_RATING) { handlePutApodRating(it) }
+            coroutineHandler(OPERATION_PUT_RATING) { checkApodIdValid(it) }
+            coroutineHandler(OPERATION_PUT_RATING) { checkRatingValue(it) }
+            coroutineHandler(OPERATION_PUT_RATING) { handlePutApodRating(it) }
 
-            coroutineHandler(Constants.OPERATION_GET_RATING) { checkApodIdValid(it) }
-            coroutineHandler(Constants.OPERATION_GET_RATING) { handleGetRating(it) }
+            coroutineHandler(OPERATION_GET_RATING) { checkApodIdValid(it) }
+            coroutineHandler(OPERATION_GET_RATING) { handleGetRating(it) }
 
-            coroutineHandler(Constants.OPERATION_GET_APOD_FOR_DATE) { checkApodIdValid(it) }
-            coroutineHandler(Constants.OPERATION_GET_APOD_FOR_DATE) { prepareHandleGetApodForDate(it) }
-            coroutineHandler(Constants.OPERATION_GET_APOD_FOR_DATE) { handleGetApodForDate(it) }
+            coroutineHandler(OPERATION_GET_APOD_FOR_DATE) { checkApodIdValid(it) }
+            coroutineHandler(OPERATION_GET_APOD_FOR_DATE) { prepareHandleGetApodForDate(it) }
+            coroutineHandler(OPERATION_GET_APOD_FOR_DATE) { handleGetApodForDate(it) }
 
-            coroutineHandler(Constants.OPERATION_GET_APODS) { handleGetApods(it) }
+            coroutineHandler(OPERATION_GET_APODS) { handleGetApods(it) }
 
-            coroutineHandler(Constants.OPERATION_POST_APOD) { handlePostApod(it) }
+            coroutineHandler(OPERATION_POST_APOD) { handlePostApod(it) }
 
-            coroutineSecurityHandler(Constants.API_AUTH_KEY) { handleApiKeyValidation(it, apiKey) }
+            coroutineSecurityHandler(API_AUTH_KEY) { handleApiKeyValidation(it, apiKey) }
         }.router.apply {
-            route(Constants.STATIC_PATH).handler(StaticHandler.create())
+            route(STATIC_PATH).handler(StaticHandler.create())
         }
 
     /**
@@ -139,7 +139,7 @@ class ApodRatingVerticle : CoroutineVerticle() {
      */
     private suspend fun handlePostApod(ctx: RoutingContext) {
         val apodRequest = asApodRequest(ctx.bodyAsJson)
-        val apiKeyHeader = ctx.request().getHeader(Constants.API_KEY_HEADER)
+        val apiKeyHeader = ctx.request().getHeader(API_KEY_HEADER)
         val resultSet = client.queryWithParamsAwait("SELECT DATE_STRING FROM APOD WHERE DATE_STRING=?",
             json { array(apodRequest.dateString) })
         when {
@@ -149,12 +149,12 @@ class ApodRatingVerticle : CoroutineVerticle() {
                     json { array(apodRequest.dateString) })
                 val newId = updateResult.keys.get<Int>(0)
                 rxVertx.eventBus().rxSend<JsonObject>(
-                    Constants.EVENTBUS_ADDRESS,
+                    EVENTBUS_ADDRESS,
                     apodQueryParameters(newId.toString(), apodRequest.dateString, apiKeyHeader)
                 ).map { asApod(it.body()) }
                     .subscribe({
                         ctx.response().setStatusCode(HttpStatus.SC_CREATED)
-                            .putHeader(Constants.LOCATION_HEADER, "/apod/$newId")
+                            .putHeader(LOCATION_HEADER, "/apod/$newId")
                             .end()
                     }) {
                         ctx.response().setStatusCode(HttpStatus.SC_INTERNAL_SERVER_ERROR)
@@ -181,7 +181,7 @@ class ApodRatingVerticle : CoroutineVerticle() {
      * @param ctx the vertx routing context
      */
     private suspend fun handleGetApods(ctx: RoutingContext) {
-        val apiKeyHeader = ctx.request().getHeader(Constants.API_KEY_HEADER)
+        val apiKeyHeader = ctx.request().getHeader(API_KEY_HEADER)
         val result = client.queryAwait("SELECT ID, DATE_STRING FROM APOD ")
         var apods: List<JsonObject>? = null
         when {
@@ -194,7 +194,7 @@ class ApodRatingVerticle : CoroutineVerticle() {
                 .map {
                     runBlocking {
                         rxVertx.eventBus().rxSend<JsonObject>(
-                            Constants.EVENTBUS_ADDRESS,
+                            EVENTBUS_ADDRESS,
                             apodQueryParameters(
                                 it.getInteger("ID").toString(),
                                 it.getString("DATE_STRING"),
@@ -224,11 +224,11 @@ class ApodRatingVerticle : CoroutineVerticle() {
      * If it does not exists or the request is somewhat erroneous, end the request here with the proper status code.
      */
     private suspend fun prepareHandleGetApodForDate(ctx: RoutingContext) {
-        val apodId = ctx.pathParam(Constants.PARAM_APOD_ID)
+        val apodId = ctx.pathParam(PARAM_APOD_ID)
         val result =
             client.queryWithParamsAwait("SELECT ID, DATE_STRING FROM APOD WHERE ID=?", json { array(apodId) })
         when (result.rows.size) {
-            1 -> ctx.put(Constants.CTX_FIELD_APOD, result.rows[0]).next()
+            1 -> ctx.put(CTX_FIELD_APOD, result.rows[0]).next()
             0 -> ctx.response().setStatusCode(HttpStatus.SC_NOT_FOUND).end()
             else -> ctx.response().setStatusCode(HttpStatus.SC_BAD_REQUEST).end()
         }
@@ -240,14 +240,14 @@ class ApodRatingVerticle : CoroutineVerticle() {
      * @param ctx the vertx routing context
      */
     private fun handleGetApodForDate(ctx: RoutingContext) {
-        val jsonObject = ctx.get<JsonObject?>(Constants.CTX_FIELD_APOD)
+        val jsonObject = ctx.get<JsonObject?>(CTX_FIELD_APOD)
         jsonObject?.apply {
             rxVertx.eventBus().rxSend<JsonObject>(
-                Constants.EVENTBUS_ADDRESS,
+                EVENTBUS_ADDRESS,
                 apodQueryParameters(
                     this.getInteger("ID").toString(),
                     this.getString("DATE_STRING"),
-                    ctx.request().getHeader(Constants.API_KEY_HEADER)
+                    ctx.request().getHeader(API_KEY_HEADER)
                 )
             ).map { asApod(it.body()) }
                 .subscribe({
@@ -268,7 +268,7 @@ class ApodRatingVerticle : CoroutineVerticle() {
      * @param ctx the vertx RoutingContext
      */
     private suspend fun handlePutApodRating(ctx: RoutingContext) {
-        val apod = ctx.pathParam(Constants.PARAM_APOD_ID)
+        val apod = ctx.pathParam(PARAM_APOD_ID)
         val rating = asRatingRequest(ctx.bodyAsJson)
         val result = client.queryWithParamsAwait("SELECT ID FROM APOD WHERE ID=?", json { array(apod) })
         when {
@@ -293,7 +293,7 @@ class ApodRatingVerticle : CoroutineVerticle() {
      * @param ctx the vertx RoutingContext
      */
     private suspend fun handleGetRating(ctx: RoutingContext) {
-        val apod = ctx.pathParam(Constants.PARAM_APOD_ID)
+        val apod = ctx.pathParam(PARAM_APOD_ID)
         val result = client.queryWithParamsAwait(
             "SELECT APOD_ID, AVG(VALUE) AS VALUE FROM RATING WHERE APOD_ID=? GROUP BY APOD_ID",
             json { array(apod) })
