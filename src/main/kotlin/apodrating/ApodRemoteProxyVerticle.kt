@@ -52,7 +52,7 @@ class ApodRemoteProxyVerticle : CoroutineVerticle() {
         launch {
             CacheManagerBuilder.newCacheManagerBuilder()
                 .withCache(
-                    "apodCache",
+                    Constants.CACHE_ALIAS,
                     CacheConfigurationBuilder
                         .newCacheConfigurationBuilder(
                             String::class.java,
@@ -63,7 +63,7 @@ class ApodRemoteProxyVerticle : CoroutineVerticle() {
                 .apply {
                     this.init()
                     apodCache = this.getCache(
-                        "apodCache",
+                        Constants.CACHE_ALIAS,
                         String::class.java,
                         Apod::class.java
                     )
@@ -72,7 +72,7 @@ class ApodRemoteProxyVerticle : CoroutineVerticle() {
 
         launch {
             circuitBreaker = CircuitBreaker.create(
-                "apod-circuit-breaker", rxVertx,
+                Constants.CIRCUIT_BREAKER_NAME, rxVertx,
                 CircuitBreakerOptions(
                     maxFailures = 3, // number of failures before opening the circuit
                     timeout = 2000L, // consider a failure if the operation does not succeed in time
@@ -88,7 +88,7 @@ class ApodRemoteProxyVerticle : CoroutineVerticle() {
         }.join()
 
         rxVertx.eventBus()
-            .consumer<JsonObject>("apodQuery") { message ->
+            .consumer<JsonObject>(Constants.EVENTBUS_ADDRESS) { message ->
                 val id: String = message.body().getString("id")
                 val dateString: String = message.body().getString("date")
                 val nasaApiKey: String = message.body().getString("nasaApiKey")
