@@ -6,6 +6,9 @@ import io.reactivex.schedulers.Schedulers
 import io.vertx.reactivex.core.AbstractVerticle
 import mu.KLogging
 
+/**
+ * Start all project verticles.
+ */
 class MainVerticle : AbstractVerticle() {
     companion object : KLogging()
 
