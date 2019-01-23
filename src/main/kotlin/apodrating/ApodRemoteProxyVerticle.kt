@@ -116,20 +116,23 @@ class ApodRemoteProxyVerticle : CoroutineVerticle() {
      *  @param date the date string
      *  @param nasaApiKey the api key provided by the client
      */
-    private fun performApodQuery(
-        id: String,
-        date: String,
-        nasaApiKey: String
-    ): Single<Apod> = when {
-        apodCache.containsKey(date) -> Single.just(apodCache.get(date)).doOnSuccess { ApodRatingVerticle.logger.info { "cache hit: $id" } }
+    private fun performApodQuery(id: String, date: String, nasaApiKey: String): Single<Apod> = when {
+        apodCache.containsKey(date) -> Single.just(apodCache.get(date))
+            .doOnSuccess { ApodRatingVerticle.logger.info { "cache hit: $id" } }
         else -> {
             val counter = AtomicInteger()
             circuitBreaker.rxExecuteCommandWithFallback<Apod>({ future ->
-                if (counter.getAndIncrement() > 0) ApodRatingVerticle.logger.info { "number of retries: ${counter.get() - 1}" }
-                createApodWebClient(date, nasaApiKey, id)
-                    .subscribe({ future.complete(it) }) { future.fail(it) }
+                if (counter.getAndIncrement() > 0)
+                    logger.info { "number of retries: ${counter.get() - 1}" }
+                rxSendGet(date, nasaApiKey, id)
+                    .doOnSuccess {
+                        if (!apodCache.containsKey(date)) {
+                            apodCache.put(date, it)
+                            ApodRatingVerticle.logger.info { "added entry to cache: ${it.id}" }
+                        }
+                    }.subscribe({ future.complete(it) }) { future.fail(it) }
             }) {
-                ApodRatingVerticle.logger.error { "Circuit opened. Error: $it - message: ${it.message}" }
+                logger.error { "Circuit opened. Error: $it - message: ${it.message}" }
                 emptyApod()
             }
         }
@@ -142,25 +145,16 @@ class ApodRemoteProxyVerticle : CoroutineVerticle() {
      * @param nasaApiKey  the NASA api key
      * @param id the apod id
      */
-    private fun createApodWebClient(
-        date: String,
-        nasaApiKey: String,
-        id: String
-    ): Single<Apod> = webClient.getAbs("https://api.nasa.gov")
-        .uri("/planetary/apod")
-        .addQueryParam("date", date)
-        .addQueryParam("api_key", nasaApiKey)
-        .addQueryParam("hd", true.toString())
-        .expect(ResponsePredicate.SC_SUCCESS)
-        .expect(ResponsePredicate.JSON)
-        .`as`(BodyCodec.jsonObject())
-        .rxSend()
-        .map { it.body() }
-        .map { asApod(id, it) }
-        .doOnSuccess {
-            if (!apodCache.containsKey(date)) {
-                apodCache.put(date, it)
-                ApodRatingVerticle.logger.info { "added entry to cache: ${it.id}" }
-            }
-        }
+    private fun rxSendGet(date: String, nasaApiKey: String, id: String): Single<Apod> =
+        webClient.getAbs("https://api.nasa.gov")
+            .uri("/planetary/apod")
+            .addQueryParam("date", date)
+            .addQueryParam("api_key", nasaApiKey)
+            .addQueryParam("hd", true.toString())
+            .expect(ResponsePredicate.SC_SUCCESS)
+            .expect(ResponsePredicate.JSON)
+            .`as`(BodyCodec.jsonObject())
+            .rxSend()
+            .map { it.body() }
+            .map { asApod(id, it) }
 }
