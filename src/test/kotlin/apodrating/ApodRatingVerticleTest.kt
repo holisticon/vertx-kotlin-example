@@ -58,11 +58,7 @@ class ApodRatingVerticleTest {
                             DeploymentOptions(JsonObject().put("config", config))
                         )
                     )
-                ) { verticles ->
-                    verticles
-                        .filter { it is String }
-                        .map { it as String }
-                }
+                ) { it.filterIsInstance<String>() }
                     .subscribe({
                         testContext.completeNow()
                     }) { error -> logger.error { error } }

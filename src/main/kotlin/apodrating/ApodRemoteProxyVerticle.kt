@@ -17,6 +17,7 @@ import io.vertx.reactivex.ext.web.client.predicate.ResponsePredicate
 import io.vertx.reactivex.ext.web.codec.BodyCodec
 import kotlinx.coroutines.launch
 import mu.KLogging
+import org.apache.http.HttpStatus
 import org.ehcache.Cache
 import org.ehcache.config.builders.CacheConfigurationBuilder
 import org.ehcache.config.builders.CacheManagerBuilder
@@ -52,18 +53,18 @@ class ApodRemoteProxyVerticle : CoroutineVerticle() {
         launch {
             CacheManagerBuilder.newCacheManagerBuilder()
                 .withCache(
-                    "apodCache",
+                    CACHE_ALIAS,
                     CacheConfigurationBuilder
                         .newCacheConfigurationBuilder(
                             String::class.java,
                             Apod::class.java,
-                            ResourcePoolsBuilder.heap(10)
+                            ResourcePoolsBuilder.heap(HEAP_POOL_SIZE)
                         )
                 ).build()
                 .apply {
                     this.init()
                     apodCache = this.getCache(
-                        "apodCache",
+                        CACHE_ALIAS,
                         String::class.java,
                         Apod::class.java
                     )
@@ -72,7 +73,7 @@ class ApodRemoteProxyVerticle : CoroutineVerticle() {
 
         launch {
             circuitBreaker = CircuitBreaker.create(
-                "apod-circuit-breaker", rxVertx,
+                CIRCUIT_BREAKER_NAME, rxVertx,
                 CircuitBreakerOptions(
                     maxFailures = 3, // number of failures before opening the circuit
                     timeout = 2000L, // consider a failure if the operation does not succeed in time
@@ -88,18 +89,21 @@ class ApodRemoteProxyVerticle : CoroutineVerticle() {
         }.join()
 
         rxVertx.eventBus()
-            .consumer<JsonObject>("apodQuery") { message ->
+            .consumer<JsonObject>(EVENTBUS_ADDRESS) { message ->
                 val id: String = message.body().getString("id")
                 val dateString: String = message.body().getString("date")
                 val nasaApiKey: String = message.body().getString("nasaApiKey")
                 performApodQuery(id, dateString, nasaApiKey).subscribe({
                     when {
-                        it == null || it.isEmpty() -> message.fail(503, "APOD API is temporarily not available")
+                        it == null || it.isEmpty() -> message.fail(
+                            HttpStatus.SC_SERVICE_UNAVAILABLE,
+                            "APOD API is temporarily not available"
+                        )
                         else -> message.reply(it.toJsonObject())
                     }
                 }) {
                     logger.error { it }
-                    message.fail(500, "Server error")
+                    message.fail(HttpStatus.SC_INTERNAL_SERVER_ERROR, "Server error")
                 }
             }
         startFuture?.tryComplete()
@@ -112,20 +116,23 @@ class ApodRemoteProxyVerticle : CoroutineVerticle() {
      *  @param date the date string
      *  @param nasaApiKey the api key provided by the client
      */
-    private fun performApodQuery(
-        id: String,
-        date: String,
-        nasaApiKey: String
-    ): Single<Apod> = when {
-        apodCache.containsKey(date) -> Single.just(apodCache.get(date)).doOnSuccess { ApodRatingVerticle.logger.info { "cache hit: $id" } }
+    private fun performApodQuery(id: String, date: String, nasaApiKey: String): Single<Apod> = when {
+        apodCache.containsKey(date) -> Single.just(apodCache.get(date))
+            .doOnSuccess { ApodRatingVerticle.logger.info { "cache hit: $id" } }
         else -> {
             val counter = AtomicInteger()
             circuitBreaker.rxExecuteCommandWithFallback<Apod>({ future ->
-                if (counter.getAndIncrement() > 0) ApodRatingVerticle.logger.info { "number of retries: ${counter.get() - 1}" }
-                createApodWebClient(date, nasaApiKey, id)
-                    .subscribe({ future.complete(it) }) { future.fail(it) }
+                if (counter.getAndIncrement() > 0)
+                    logger.info { "number of retries: ${counter.get() - 1}" }
+                rxSendGet(date, nasaApiKey, id)
+                    .doOnSuccess {
+                        if (!apodCache.containsKey(date)) {
+                            apodCache.put(date, it)
+                            ApodRatingVerticle.logger.info { "added entry to cache: ${it.id}" }
+                        }
+                    }.subscribe({ future.complete(it) }) { future.fail(it) }
             }) {
-                ApodRatingVerticle.logger.error { "Circuit opened. Error: $it - message: ${it.message}" }
+                logger.error { "Circuit opened. Error: $it - message: ${it.message}" }
                 emptyApod()
             }
         }
@@ -138,25 +145,16 @@ class ApodRemoteProxyVerticle : CoroutineVerticle() {
      * @param nasaApiKey  the NASA api key
      * @param id the apod id
      */
-    private fun createApodWebClient(
-        date: String,
-        nasaApiKey: String,
-        id: String
-    ): Single<Apod> = webClient.getAbs("https://api.nasa.gov")
-        .uri("/planetary/apod")
-        .addQueryParam("date", date)
-        .addQueryParam("api_key", nasaApiKey)
-        .addQueryParam("hd", true.toString())
-        .expect(ResponsePredicate.SC_SUCCESS)
-        .expect(ResponsePredicate.JSON)
-        .`as`(BodyCodec.jsonObject())
-        .rxSend()
-        .map { it.body() }
-        .map { asApod(id, it) }
-        .doOnSuccess {
-            if (!apodCache.containsKey(date)) {
-                apodCache.put(date, it)
-                ApodRatingVerticle.logger.info { "added entry to cache: ${it.id}" }
-            }
-        }
+    private fun rxSendGet(date: String, nasaApiKey: String, id: String): Single<Apod> =
+        webClient.getAbs("https://api.nasa.gov")
+            .uri("/planetary/apod")
+            .addQueryParam("date", date)
+            .addQueryParam("api_key", nasaApiKey)
+            .addQueryParam("hd", true.toString())
+            .expect(ResponsePredicate.SC_SUCCESS)
+            .expect(ResponsePredicate.JSON)
+            .`as`(BodyCodec.jsonObject())
+            .rxSend()
+            .map { it.body() }
+            .map { asApod(id, it) }
 }

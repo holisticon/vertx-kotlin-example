@@ -6,6 +6,9 @@ import io.reactivex.schedulers.Schedulers
 import io.vertx.reactivex.core.AbstractVerticle
 import mu.KLogging
 
+/**
+ * Start all project verticles.
+ */
 class MainVerticle : AbstractVerticle() {
     companion object : KLogging()
 
@@ -22,11 +25,8 @@ class MainVerticle : AbstractVerticle() {
                     deploymentOptionsFromEnv(vertx)
                 )
             )
-        ) { verticles ->
-            verticles
-                .filter { it is String }
-                .map { it as String }
-        }.subscribeOn(Schedulers.computation())
+        ) { it.filterIsInstance<String>() }
+            .subscribeOn(Schedulers.computation())
             .subscribe({ verticles ->
                 logger.info {
                     "Started MainVerticle with ${verticles.size} child " +

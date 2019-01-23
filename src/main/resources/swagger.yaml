@@ -242,6 +242,7 @@ components:
         dateString:
           description: The date string of this apod
           type: string
+          pattern: '^([12]\d{3}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01]))$'
           readOnly: true
     Rating:
       description: an apod rating
