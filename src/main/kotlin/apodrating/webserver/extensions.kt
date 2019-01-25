@@ -1,9 +1,14 @@
 package apodrating.webserver
 
 import apodrating.model.Error
+import apodrating.model.asApodRequest
 import apodrating.model.toJsonString
 import io.vertx.core.http.HttpServerOptions
+import io.vertx.ext.jdbc.JDBCClient
+import io.vertx.kotlin.core.json.array
+import io.vertx.kotlin.core.json.json
 import io.vertx.kotlin.core.net.PemKeyCertOptions
+import io.vertx.kotlin.ext.sql.queryWithParamsAwait
 import io.vertx.reactivex.ext.web.RoutingContext
 import org.apache.http.HttpStatus
 
@@ -22,36 +27,28 @@ fun handleApiKeyValidation(ctx: RoutingContext, apiKey: String) =
     }
 
 /**
- * Check if the apodId is an integer
- */
-fun checkApodIdValid(ctx: RoutingContext) =
-    when {
-        ctx.pathParam("apodId").toIntOrNull() != null -> ctx.next()
-        else -> ctx.response().setStatusCode(HttpStatus.SC_BAD_REQUEST).end(
-            Error(
-                HttpStatus.SC_BAD_REQUEST,
-                "path parameter must be an integer, e.g. /apod/42"
-            ).toJsonString()
-        )
-    }
-
-/**
- * Check if the request contains a valid rating value.
- */
-fun checkRatingValue(ctx: RoutingContext) = when (ctx.bodyAsJson.getInteger("rating", 0)) {
-    in 1..10 -> ctx.next()
-    else -> ctx.response().setStatusCode(HttpStatus.SC_BAD_REQUEST).end(
-        Error(
-            HttpStatus.SC_BAD_REQUEST,
-            "asRating must be an integer between 1 and 10"
-        ).toJsonString()
-    )
-}
-
-/**
  * Options necessary for creating an http2 server
  */
 fun http2ServerOptions(): HttpServerOptions = HttpServerOptions()
-    .setKeyCertOptions(PemKeyCertOptions().setCertPath("tls/server-cert.pem").setKeyPath("tls/server-key.pem"))
+    .setKeyCertOptions(
+        PemKeyCertOptions()
+            .setCertPath("tls/server-cert.pem")
+            .setKeyPath("tls/server-key.pem")
+    )
     .setSsl(true)
     .setUseAlpn(true)
+
+suspend fun prepareHandlePostApod(ctx: RoutingContext, client: JDBCClient) {
+    val apodRequest = asApodRequest(ctx.bodyAsJson)
+    val resultSet = client.queryWithParamsAwait("SELECT DATE_STRING FROM APOD WHERE DATE_STRING=?",
+        json { array(apodRequest.dateString) })
+    when {
+        resultSet.rows.size == 0 -> ctx.next()
+        else -> ctx.response().setStatusCode(HttpStatus.SC_CONFLICT).end(
+            Error(
+                HttpStatus.SC_CONFLICT,
+                "Entry already exists"
+            ).toJsonString()
+        )
+    }
+}

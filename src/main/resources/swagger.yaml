@@ -86,6 +86,7 @@ paths:
           description: the id of the picture
           schema:
             type: string
+            pattern: '^\d+$'
       responses:
         '200':
           description: the picture's title and hd uri
@@ -124,6 +125,7 @@ paths:
           description: the id of the apod
           schema:
             type: string
+            pattern: '^\d+$'
       responses:
         '200':
           description: the requested apod
@@ -167,6 +169,7 @@ paths:
           description: the id of the apod
           schema:
             type: string
+            pattern: '^\d+$'
       requestBody:
         required: true
         description: The rating you want to set
@@ -234,6 +237,8 @@ components:
           description: The title of this apod
           type: integer
           format: int32
+          minimum: 1
+          maximum: 10
     ApodRequest:
       description: a create apod request payload
       required:

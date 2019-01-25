@@ -10,10 +10,9 @@ import apodrating.model.asRating
 import apodrating.model.asRatingRequest
 import apodrating.model.isEmpty
 import apodrating.model.toJsonString
-import apodrating.webserver.checkApodIdValid
-import apodrating.webserver.checkRatingValue
 import apodrating.webserver.handleApiKeyValidation
 import apodrating.webserver.http2ServerOptions
+import apodrating.webserver.prepareHandlePostApod
 import io.reactivex.Single
 import io.reactivex.schedulers.Schedulers
 import io.vertx.core.Future
@@ -112,20 +111,17 @@ class ApodRatingVerticle : CoroutineVerticle() {
      */
     private fun createRouter(routerFactory: OpenAPI3RouterFactory): Handler<HttpServerRequest> =
         routerFactory.apply {
-            coroutineHandler(OPERATION_PUT_RATING) { checkApodIdValid(it) }
-            coroutineHandler(OPERATION_PUT_RATING) { checkRatingValue(it) }
-            coroutineHandler(OPERATION_PUT_RATING) { handlePutApodRating(it) }
+            coroutineHandler(operationId = OPERATION_PUT_RATING) { handlePutApodRating(it) }
 
-            coroutineHandler(OPERATION_GET_RATING) { checkApodIdValid(it) }
-            coroutineHandler(OPERATION_GET_RATING) { handleGetRating(it) }
+            coroutineHandler(operationId = OPERATION_GET_RATING) { handleGetRating(it) }
 
-            coroutineHandler(OPERATION_GET_APOD_FOR_DATE) { checkApodIdValid(it) }
-            coroutineHandler(OPERATION_GET_APOD_FOR_DATE) { prepareHandleGetApodForDate(it) }
-            coroutineHandler(OPERATION_GET_APOD_FOR_DATE) { handleGetApodForDate(it) }
+            coroutineHandler(operationId = OPERATION_GET_APOD_FOR_DATE) { prepareHandleGetApodForDate(it) }
+            coroutineHandler(operationId = OPERATION_GET_APOD_FOR_DATE) { handleGetApodForDate(it) }
 
-            coroutineHandler(OPERATION_GET_APODS) { handleGetApods(it) }
+            coroutineHandler(operationId = OPERATION_GET_APODS) { prepareHandlePostApod(it, client) }
+            coroutineHandler(operationId = OPERATION_GET_APODS) { handleGetApods(it) }
 
-            coroutineHandler(OPERATION_POST_APOD) { handlePostApod(it) }
+            coroutineHandler(operationId = OPERATION_POST_APOD) { handlePostApod(it) }
 
             coroutineSecurityHandler(API_AUTH_KEY) { handleApiKeyValidation(it, apiKey) }
         }.router.apply {
@@ -140,39 +136,27 @@ class ApodRatingVerticle : CoroutineVerticle() {
     private suspend fun handlePostApod(ctx: RoutingContext) {
         val apodRequest = asApodRequest(ctx.bodyAsJson)
         val apiKeyHeader = ctx.request().getHeader(API_KEY_HEADER)
-        val resultSet = client.queryWithParamsAwait("SELECT DATE_STRING FROM APOD WHERE DATE_STRING=?",
+        val updateResult = client.updateWithParamsAwait(
+            "INSERT INTO APOD (DATE_STRING) VALUES ?",
             json { array(apodRequest.dateString) })
-        when {
-            resultSet.rows.size == 0 -> {
-                val updateResult = client.updateWithParamsAwait(
-                    "INSERT INTO APOD (DATE_STRING) VALUES ?",
-                    json { array(apodRequest.dateString) })
-                val newId = updateResult.keys.get<Int>(0)
-                rxVertx.eventBus().rxSend<JsonObject>(
-                    EVENTBUS_ADDRESS,
-                    apodQueryParameters(newId.toString(), apodRequest.dateString, apiKeyHeader)
-                ).map { asApod(it.body()) }
-                    .subscribe({
-                        ctx.response().setStatusCode(HttpStatus.SC_CREATED)
-                            .putHeader(LOCATION_HEADER, "/apod/$newId")
-                            .end()
-                    }) {
-                        ctx.response().setStatusCode(HttpStatus.SC_INTERNAL_SERVER_ERROR)
-                            .end(
-                                Error(
-                                    HttpStatus.SC_INTERNAL_SERVER_ERROR,
-                                    "Could not create apod entry. ${it.message}"
-                                ).toJsonString()
-                            )
-                    }
+        val newId = updateResult.keys.get<Int>(0)
+        rxVertx.eventBus().rxSend<JsonObject>(
+            EVENTBUS_ADDRESS,
+            apodQueryParameters(newId.toString(), apodRequest.dateString, apiKeyHeader)
+        ).map { asApod(it.body()) }
+            .subscribe({
+                ctx.response().setStatusCode(HttpStatus.SC_CREATED)
+                    .putHeader(LOCATION_HEADER, "/apod/$newId")
+                    .end()
+            }) {
+                ctx.response().setStatusCode(HttpStatus.SC_INTERNAL_SERVER_ERROR)
+                    .end(
+                        Error(
+                            HttpStatus.SC_INTERNAL_SERVER_ERROR,
+                            "Could not create apod entry. ${it.message}"
+                        ).toJsonString()
+                    )
             }
-            else -> ctx.response().setStatusCode(HttpStatus.SC_CONFLICT).end(
-                Error(
-                    HttpStatus.SC_CONFLICT,
-                    "Entry already exists"
-                ).toJsonString()
-            )
-        }
     }
 
     /**

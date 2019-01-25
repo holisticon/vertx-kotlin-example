@@ -119,11 +119,10 @@ class ApodRemoteProxyVerticle : CoroutineVerticle() {
     private fun performApodQuery(id: String, date: String, nasaApiKey: String): Single<Apod> = when {
         apodCache.containsKey(date) -> Single.just(apodCache.get(date))
             .doOnSuccess { ApodRatingVerticle.logger.info { "cache hit: $id" } }
-        else -> {
-            val counter = AtomicInteger()
+        else -> with(AtomicInteger()) {
             circuitBreaker.rxExecuteCommandWithFallback<Apod>({ future ->
-                if (counter.getAndIncrement() > 0)
-                    logger.info { "number of retries: ${counter.get() - 1}" }
+                if (this.getAndIncrement() > 0)
+                    logger.info { "number of retries: ${this.get() - 1}" }
                 rxSendGet(date, nasaApiKey, id)
                     .doOnSuccess {
                         if (!apodCache.containsKey(date)) {
@@ -136,6 +135,7 @@ class ApodRemoteProxyVerticle : CoroutineVerticle() {
                 emptyApod()
             }
         }
+
     }
 
     /**
