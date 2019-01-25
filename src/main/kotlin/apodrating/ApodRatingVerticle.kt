@@ -118,9 +118,9 @@ class ApodRatingVerticle : CoroutineVerticle() {
             coroutineHandler(operationId = OPERATION_GET_APOD_FOR_DATE) { prepareHandleGetApodForDate(it) }
             coroutineHandler(operationId = OPERATION_GET_APOD_FOR_DATE) { handleGetApodForDate(it) }
 
-            coroutineHandler(operationId = OPERATION_GET_APODS) { prepareHandlePostApod(it, client) }
             coroutineHandler(operationId = OPERATION_GET_APODS) { handleGetApods(it) }
 
+            coroutineHandler(operationId = OPERATION_POST_APOD) { prepareHandlePostApod(it, client) }
             coroutineHandler(operationId = OPERATION_POST_APOD) { handlePostApod(it) }
 
             coroutineSecurityHandler(API_AUTH_KEY) { handleApiKeyValidation(it, apiKey) }
