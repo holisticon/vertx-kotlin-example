@@ -60,7 +60,7 @@ class ApodRatingVerticle : CoroutineVerticle() {
     override fun start(startFuture: Future<Void>?) {
         launch {
             val apodConfig = ApodRatingConfiguration(config)
-            client = JDBCClient.createShared(vertx, apodConfig.toJsonObject())
+            client = JDBCClient.createShared(vertx, apodConfig.toJdbcConfig())
             apiKey = apodConfig.nasaApiKey
             rxVertx = Vertx(vertx)
             val statements = listOf(
@@ -298,16 +298,6 @@ class ApodRatingVerticle : CoroutineVerticle() {
         }
     }
 
-    /**
-     * An extension function for simplifying coroutines usage with Vert.x Web router factories.
-     *
-     * The arrow operator "->" denotes the function type where it separates parameters types from result type.
-     *
-     * To find out what this function really does, I suggest you inline it temporarily.
-     *
-     * @param operationId the operationId from swagger
-     * @param function the function that is being executed suspendedly
-     */
     private fun OpenAPI3RouterFactory.coroutineHandler(
         operationId: String,
         function: suspend (RoutingContext) -> Unit
@@ -322,9 +312,6 @@ class ApodRatingVerticle : CoroutineVerticle() {
             }
         }
 
-    /**
-     * An extension function to handle security
-     */
     private fun OpenAPI3RouterFactory.coroutineSecurityHandler(
         securitySchemaName: String,
         function: suspend (RoutingContext) -> Unit

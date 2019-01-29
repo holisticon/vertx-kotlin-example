@@ -13,15 +13,21 @@ import io.vertx.reactivex.core.Vertx
  */
 data class ApodRatingConfiguration(
     val config: JsonObject,
-    val port: Int = config.getInteger("APODRATING_PORT", 8080),
-    val h2Port: Int = config.getInteger("APODRATING_H2_PORT", 8443),
-    val jdbcUrl: String = config.getString("JDBC_URL", "org.hsqldb.jdbcDriver"),
-    val jdbcDriver: String = config.getString("JDBC_DRIVER", "org.hsqldb.jdbcDriver"),
-    val jdbcPoolSize: Int = config.getInteger("JDBC_MAX_POOL_SIZE", 30),
-    var nasaApiKey: String = config.getString("NASA_API_KEY")
+    val port: Int = config.getInteger("APODRATING_PORT"),
+    val h2Port: Int = config.getInteger("APODRATING_H2_PORT"),
+    val jdbcUrl: String = config.getString("JDBC_URL"),
+    val jdbcDriver: String = config.getString("JDBC_DRIVER"),
+    val jdbcPoolSize: Int = config.getInteger("JDBC_MAX_POOL_SIZE"),
+    val nasaApiKey: String = config.getString("NASA_API_KEY"),
+    val nasaApiHost: String = config.getString("NASA_API_HOST"),
+    val nasaApiPath: String = config.getString("NASA_API_PATH")
+
 ) {
 
-    fun toJsonObject() = json {
+    /**
+     * Return a JSON representation of this config object.
+     */
+    fun toJdbcConfig() = json {
         obj(
             "url" to jdbcUrl,
             "driver_class" to jdbcDriver,
