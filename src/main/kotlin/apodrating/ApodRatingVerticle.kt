@@ -19,6 +19,7 @@ import io.vertx.core.Future
 import io.vertx.core.Handler
 import io.vertx.core.json.JsonObject
 import io.vertx.ext.jdbc.JDBCClient
+import io.vertx.kotlin.core.json.Json
 import io.vertx.kotlin.core.json.JsonArray
 import io.vertx.kotlin.core.json.array
 import io.vertx.kotlin.core.json.get
@@ -193,7 +194,7 @@ class ApodRatingVerticle : CoroutineVerticle() {
                     .filterIsInstance<Apod>()
                     .filter { !it.isEmpty() }
             }.subscribeOn(Schedulers.io())
-                .subscribe({ ctx.response().setStatusCode(HttpStatus.SC_OK).end(JsonArray(it).encode()) })
+                .subscribe({ ctx.response().setStatusCode(HttpStatus.SC_OK).end(Json.array(it).encode()) })
                 {
                     ctx.response().setStatusCode(HttpStatus.SC_INTERNAL_SERVER_ERROR)
                         .end(Error(HttpStatus.SC_INTERNAL_SERVER_ERROR, "${it.message}").toJsonString())

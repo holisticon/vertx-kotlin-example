@@ -7,7 +7,7 @@ import io.vertx.core.http.HttpServerOptions
 import io.vertx.ext.jdbc.JDBCClient
 import io.vertx.kotlin.core.json.array
 import io.vertx.kotlin.core.json.json
-import io.vertx.kotlin.core.net.PemKeyCertOptions
+import io.vertx.kotlin.core.net.pemKeyCertOptionsOf
 import io.vertx.kotlin.ext.sql.queryWithParamsAwait
 import io.vertx.reactivex.ext.web.RoutingContext
 import org.apache.http.HttpStatus
@@ -31,9 +31,7 @@ fun handleApiKeyValidation(ctx: RoutingContext, apiKey: String) =
  */
 fun http2ServerOptions(): HttpServerOptions = HttpServerOptions()
     .setKeyCertOptions(
-        PemKeyCertOptions()
-            .setCertPath("tls/server-cert.pem")
-            .setKeyPath("tls/server-key.pem")
+        pemKeyCertOptionsOf(certPath = "tls/server-cert.pem", keyPath = "tls/server-key.pem")
     )
     .setSsl(true)
     .setUseAlpn(true)

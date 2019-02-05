@@ -9,7 +9,7 @@ import apodrating.model.toJsonObject
 import io.reactivex.Single
 import io.vertx.core.Future
 import io.vertx.core.json.JsonObject
-import io.vertx.kotlin.circuitbreaker.CircuitBreakerOptions
+import io.vertx.kotlin.circuitbreaker.circuitBreakerOptionsOf
 import io.vertx.kotlin.coroutines.CoroutineVerticle
 import io.vertx.reactivex.circuitbreaker.CircuitBreaker
 import io.vertx.reactivex.core.Vertx
@@ -72,7 +72,7 @@ class ApodRemoteProxyVerticle : CoroutineVerticle() {
             launch {
                 circuitBreaker = CircuitBreaker.create(
                     CIRCUIT_BREAKER_NAME, rxVertx,
-                    CircuitBreakerOptions(
+                    circuitBreakerOptionsOf(
                         maxFailures = 3, // number of failures before opening the circuit
                         timeout = 2000L, // consider a failure if the operation does not succeed in time
                         fallbackOnFailure = true, // do we call the fallback on failure
