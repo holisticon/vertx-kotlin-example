@@ -10,10 +10,9 @@ import apodrating.model.asRating
 import apodrating.model.asRatingRequest
 import apodrating.model.isEmpty
 import apodrating.model.toJsonString
-import apodrating.webserver.checkApodIdValid
-import apodrating.webserver.checkRatingValue
 import apodrating.webserver.handleApiKeyValidation
 import apodrating.webserver.http2ServerOptions
+import apodrating.webserver.prepareHandlePostApod
 import io.reactivex.Single
 import io.reactivex.schedulers.Schedulers
 import io.vertx.core.Future
@@ -61,7 +60,7 @@ class ApodRatingVerticle : CoroutineVerticle() {
     override fun start(startFuture: Future<Void>?) {
         launch {
             val apodConfig = ApodRatingConfiguration(config)
-            client = JDBCClient.createShared(vertx, apodConfig.toJsonObject())
+            client = JDBCClient.createShared(vertx, apodConfig.toJdbcConfig())
             apiKey = apodConfig.nasaApiKey
             rxVertx = Vertx(vertx)
             val statements = listOf(
@@ -112,20 +111,17 @@ class ApodRatingVerticle : CoroutineVerticle() {
      */
     private fun createRouter(routerFactory: OpenAPI3RouterFactory): Handler<HttpServerRequest> =
         routerFactory.apply {
-            coroutineHandler(OPERATION_PUT_RATING) { checkApodIdValid(it) }
-            coroutineHandler(OPERATION_PUT_RATING) { checkRatingValue(it) }
-            coroutineHandler(OPERATION_PUT_RATING) { handlePutApodRating(it) }
+            coroutineHandler(operationId = OPERATION_PUT_RATING) { handlePutApodRating(it) }
 
-            coroutineHandler(OPERATION_GET_RATING) { checkApodIdValid(it) }
-            coroutineHandler(OPERATION_GET_RATING) { handleGetRating(it) }
+            coroutineHandler(operationId = OPERATION_GET_RATING) { handleGetRating(it) }
 
-            coroutineHandler(OPERATION_GET_APOD_FOR_DATE) { checkApodIdValid(it) }
-            coroutineHandler(OPERATION_GET_APOD_FOR_DATE) { prepareHandleGetApodForDate(it) }
-            coroutineHandler(OPERATION_GET_APOD_FOR_DATE) { handleGetApodForDate(it) }
+            coroutineHandler(operationId = OPERATION_GET_APOD_FOR_DATE) { prepareHandleGetApodForDate(it) }
+            coroutineHandler(operationId = OPERATION_GET_APOD_FOR_DATE) { handleGetApodForDate(it) }
 
-            coroutineHandler(OPERATION_GET_APODS) { handleGetApods(it) }
+            coroutineHandler(operationId = OPERATION_GET_APODS) { handleGetApods(it) }
 
-            coroutineHandler(OPERATION_POST_APOD) { handlePostApod(it) }
+            coroutineHandler(operationId = OPERATION_POST_APOD) { prepareHandlePostApod(it, client) }
+            coroutineHandler(operationId = OPERATION_POST_APOD) { handlePostApod(it) }
 
             coroutineSecurityHandler(API_AUTH_KEY) { handleApiKeyValidation(it, apiKey) }
         }.router.apply {
@@ -140,39 +136,27 @@ class ApodRatingVerticle : CoroutineVerticle() {
     private suspend fun handlePostApod(ctx: RoutingContext) {
         val apodRequest = asApodRequest(ctx.bodyAsJson)
         val apiKeyHeader = ctx.request().getHeader(API_KEY_HEADER)
-        val resultSet = client.queryWithParamsAwait("SELECT DATE_STRING FROM APOD WHERE DATE_STRING=?",
+        val updateResult = client.updateWithParamsAwait(
+            "INSERT INTO APOD (DATE_STRING) VALUES ?",
             json { array(apodRequest.dateString) })
-        when {
-            resultSet.rows.size == 0 -> {
-                val updateResult = client.updateWithParamsAwait(
-                    "INSERT INTO APOD (DATE_STRING) VALUES ?",
-                    json { array(apodRequest.dateString) })
-                val newId = updateResult.keys.get<Int>(0)
-                rxVertx.eventBus().rxSend<JsonObject>(
-                    EVENTBUS_ADDRESS,
-                    apodQueryParameters(newId.toString(), apodRequest.dateString, apiKeyHeader)
-                ).map { asApod(it.body()) }
-                    .subscribe({
-                        ctx.response().setStatusCode(HttpStatus.SC_CREATED)
-                            .putHeader(LOCATION_HEADER, "/apod/$newId")
-                            .end()
-                    }) {
-                        ctx.response().setStatusCode(HttpStatus.SC_INTERNAL_SERVER_ERROR)
-                            .end(
-                                Error(
-                                    HttpStatus.SC_INTERNAL_SERVER_ERROR,
-                                    "Could not create apod entry. ${it.message}"
-                                ).toJsonString()
-                            )
-                    }
+        val newId = updateResult.keys.get<Int>(0)
+        rxVertx.eventBus().rxSend<JsonObject>(
+            EVENTBUS_ADDRESS,
+            apodQueryParameters(newId.toString(), apodRequest.dateString, apiKeyHeader)
+        ).map { asApod(it.body()) }
+            .subscribe({
+                ctx.response().setStatusCode(HttpStatus.SC_CREATED)
+                    .putHeader(LOCATION_HEADER, "/apod/$newId")
+                    .end()
+            }) {
+                ctx.response().setStatusCode(HttpStatus.SC_INTERNAL_SERVER_ERROR)
+                    .end(
+                        Error(
+                            HttpStatus.SC_INTERNAL_SERVER_ERROR,
+                            "Could not create apod entry. ${it.message}"
+                        ).toJsonString()
+                    )
             }
-            else -> ctx.response().setStatusCode(HttpStatus.SC_CONFLICT).end(
-                Error(
-                    HttpStatus.SC_CONFLICT,
-                    "Entry already exists"
-                ).toJsonString()
-            )
-        }
     }
 
     /**
@@ -222,6 +206,8 @@ class ApodRatingVerticle : CoroutineVerticle() {
      * processing.
      *
      * If it does not exists or the request is somewhat erroneous, end the request here with the proper status code.
+     *
+     * @param ctx the vertx routing context
      */
     private suspend fun prepareHandleGetApodForDate(ctx: RoutingContext) {
         val apodId = ctx.pathParam(PARAM_APOD_ID)
@@ -268,14 +254,14 @@ class ApodRatingVerticle : CoroutineVerticle() {
      * @param ctx the vertx RoutingContext
      */
     private suspend fun handlePutApodRating(ctx: RoutingContext) {
-        val apod = ctx.pathParam(PARAM_APOD_ID)
+        val apodId = ctx.pathParam(PARAM_APOD_ID)
         val rating = asRatingRequest(ctx.bodyAsJson)
-        val result = client.queryWithParamsAwait("SELECT ID FROM APOD WHERE ID=?", json { array(apod) })
+        val result = client.queryWithParamsAwait("SELECT ID FROM APOD WHERE ID=?", json { array(apodId) })
         when {
             result.rows.size == 1 -> {
                 client.updateWithParamsAwait(
                     "INSERT INTO RATING (VALUE, APOD_ID) VALUES ?, ?",
-                    json { array(rating.rating, apod) })
+                    json { array(rating.rating, apodId) })
                 ctx.response().setStatusCode(HttpStatus.SC_NO_CONTENT).end()
             }
             else -> ctx.response().setStatusCode(HttpStatus.SC_NOT_FOUND).end(
@@ -293,10 +279,10 @@ class ApodRatingVerticle : CoroutineVerticle() {
      * @param ctx the vertx RoutingContext
      */
     private suspend fun handleGetRating(ctx: RoutingContext) {
-        val apod = ctx.pathParam(PARAM_APOD_ID)
+        val apodId = ctx.pathParam(PARAM_APOD_ID)
         val result = client.queryWithParamsAwait(
             "SELECT APOD_ID, AVG(VALUE) AS VALUE FROM RATING WHERE APOD_ID=? GROUP BY APOD_ID",
-            json { array(apod) })
+            json { array(apodId) })
         when (result.rows.size) {
             1 -> ctx.response().end(asRating(result).toJsonString())
             0 -> ctx.response().setStatusCode(HttpStatus.SC_NOT_FOUND).end(
@@ -314,44 +300,19 @@ class ApodRatingVerticle : CoroutineVerticle() {
         }
     }
 
-    /**
-     * An extension function for simplifying coroutines usage with Vert.x Web router factories.
-     *
-     * The arrow operator "->" denotes the function type where it separates parameters types from result type.
-     *
-     * To find out what this function really does, I suggest you inline it temporarily.
-     *
-     * @param operationId the operationId from swagger
-     * @param function the function that is being executed suspendedly
-     */
     private fun OpenAPI3RouterFactory.coroutineHandler(
         operationId: String,
         function: suspend (RoutingContext) -> Unit
     ) =
         addHandlerByOperationId(operationId) {
-            launch {
-                try {
-                    function(it)
-                } catch (exception: Exception) {
-                    it.fail(exception)
-                }
-            }
+            launch { function(it) }
         }
 
-    /**
-     * An extension function to handle security
-     */
     private fun OpenAPI3RouterFactory.coroutineSecurityHandler(
         securitySchemaName: String,
         function: suspend (RoutingContext) -> Unit
     ) =
         addSecurityHandler(securitySchemaName) {
-            launch {
-                try {
-                    function(it)
-                } catch (exception: Exception) {
-                    it.fail(exception)
-                }
-            }
+            launch { function(it) }
         }
 }

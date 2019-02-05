@@ -6,7 +6,7 @@ import io.vertx.reactivex.core.Vertx
 /**
  * Start our application.
  */
-fun main(args: Array<String>) = with(Vertx.vertx()) {
+fun main() = with(Vertx.vertx()) {
     this.rxDeployVerticle(MainVerticle::class.java.canonicalName, deploymentOptionsFromEnv(this))
         .subscribe()
         .dispose()
