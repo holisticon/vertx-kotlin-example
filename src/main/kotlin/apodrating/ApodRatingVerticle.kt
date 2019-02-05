@@ -206,6 +206,8 @@ class ApodRatingVerticle : CoroutineVerticle() {
      * processing.
      *
      * If it does not exists or the request is somewhat erroneous, end the request here with the proper status code.
+     *
+     * @param ctx the vertx routing context
      */
     private suspend fun prepareHandleGetApodForDate(ctx: RoutingContext) {
         val apodId = ctx.pathParam(PARAM_APOD_ID)
@@ -252,14 +254,14 @@ class ApodRatingVerticle : CoroutineVerticle() {
      * @param ctx the vertx RoutingContext
      */
     private suspend fun handlePutApodRating(ctx: RoutingContext) {
-        val apod = ctx.pathParam(PARAM_APOD_ID)
+        val apodId = ctx.pathParam(PARAM_APOD_ID)
         val rating = asRatingRequest(ctx.bodyAsJson)
-        val result = client.queryWithParamsAwait("SELECT ID FROM APOD WHERE ID=?", json { array(apod) })
+        val result = client.queryWithParamsAwait("SELECT ID FROM APOD WHERE ID=?", json { array(apodId) })
         when {
             result.rows.size == 1 -> {
                 client.updateWithParamsAwait(
                     "INSERT INTO RATING (VALUE, APOD_ID) VALUES ?, ?",
-                    json { array(rating.rating, apod) })
+                    json { array(rating.rating, apodId) })
                 ctx.response().setStatusCode(HttpStatus.SC_NO_CONTENT).end()
             }
             else -> ctx.response().setStatusCode(HttpStatus.SC_NOT_FOUND).end(
@@ -277,10 +279,10 @@ class ApodRatingVerticle : CoroutineVerticle() {
      * @param ctx the vertx RoutingContext
      */
     private suspend fun handleGetRating(ctx: RoutingContext) {
-        val apod = ctx.pathParam(PARAM_APOD_ID)
+        val apodId = ctx.pathParam(PARAM_APOD_ID)
         val result = client.queryWithParamsAwait(
             "SELECT APOD_ID, AVG(VALUE) AS VALUE FROM RATING WHERE APOD_ID=? GROUP BY APOD_ID",
-            json { array(apod) })
+            json { array(apodId) })
         when (result.rows.size) {
             1 -> ctx.response().end(asRating(result).toJsonString())
             0 -> ctx.response().setStatusCode(HttpStatus.SC_NOT_FOUND).end(
@@ -303,13 +305,7 @@ class ApodRatingVerticle : CoroutineVerticle() {
         function: suspend (RoutingContext) -> Unit
     ) =
         addHandlerByOperationId(operationId) {
-            launch {
-                try {
-                    function(it)
-                } catch (exception: Exception) {
-                    it.fail(exception)
-                }
-            }
+            launch { function(it) }
         }
 
     private fun OpenAPI3RouterFactory.coroutineSecurityHandler(
@@ -317,12 +313,6 @@ class ApodRatingVerticle : CoroutineVerticle() {
         function: suspend (RoutingContext) -> Unit
     ) =
         addSecurityHandler(securitySchemaName) {
-            launch {
-                try {
-                    function(it)
-                } catch (exception: Exception) {
-                    it.fail(exception)
-                }
-            }
+            launch { function(it) }
         }
 }

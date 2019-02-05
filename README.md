@@ -30,7 +30,7 @@ export NASA_API_KEY="YOUR_NASA_API_KEY"
 
 ## Building
 
-The `pom.xml` contains a default maven goal that you can use if yu have a 
+The `pom.xml` contains a default maven goal that you can use if you have a 
 java executable of version 11 in your path. So all you have to do is
 
 ```bash
@@ -50,15 +50,7 @@ the file `test-compile.sh`:
 variables from `.env` to the applycation.
 1. Run the `main()` function from the file `main.kt`.
 
-### Running as a far jar
-
-```bash
-> mvn package
-> java -jar target/application.jar
-```
-
-### Running from the CLI
-
+### Running from the CLI with the enclosed script
 
 ```bash
 > ./run.sh
@@ -66,7 +58,7 @@ variables from `.env` to the applycation.
 
 ## API
 
-Visit one of the local addresses
+After the pplication started, visit one of the local addresses
 - [swagger ui instance http 1.1](http://localhost:8081/ui/index.html)
 - [swagger ui instance http 2](https://localhost:8443/ui/index.html)
 
@@ -79,7 +71,7 @@ You can learn more about an apod
 ```
 ```json
 {
-  "id": "3",
+  "id": "0",
   "dateString": "2018-07-01",
   "title": "Fresh Tiger Stripes on Saturn's Enceladus",
   "imageUriHd": "https://apod.nasa.gov/apod/image/1807/enceladusstripes_cassini_3237.jpg"
