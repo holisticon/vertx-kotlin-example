@@ -5,8 +5,8 @@ package apodrating.model
 import io.vertx.core.DeploymentOptions
 import io.vertx.core.json.JsonObject
 import io.vertx.ext.sql.ResultSet
-import io.vertx.kotlin.config.ConfigRetrieverOptions
-import io.vertx.kotlin.config.ConfigStoreOptions
+import io.vertx.kotlin.config.configRetrieverOptionsOf
+import io.vertx.kotlin.config.configStoreOptionsOf
 import io.vertx.kotlin.core.json.get
 import io.vertx.kotlin.core.json.json
 import io.vertx.kotlin.core.json.obj
@@ -98,9 +98,9 @@ fun Error.toJsonString(): String = this.toJsonObject().encode()
 /**
  * Get deployment options configured by environment variables.
  */
-fun deploymentOptionsFromEnv(vertx: Vertx): DeploymentOptions = ConfigRetrieverOptions(
+fun deploymentOptionsFromEnv(vertx: Vertx): DeploymentOptions = configRetrieverOptionsOf(
     scanPeriod = 2000,
-    stores = listOf(ConfigStoreOptions(type = "env"))
+    stores = listOf(configStoreOptionsOf(type = "env"))
 ).deploymentOptions(vertx)
 
 /**

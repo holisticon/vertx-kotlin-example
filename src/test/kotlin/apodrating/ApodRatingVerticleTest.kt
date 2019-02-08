@@ -5,8 +5,8 @@ import io.vertx.core.DeploymentOptions
 import io.vertx.core.json.JsonObject
 import io.vertx.junit5.VertxExtension
 import io.vertx.junit5.VertxTestContext
-import io.vertx.kotlin.config.ConfigRetrieverOptions
-import io.vertx.kotlin.config.ConfigStoreOptions
+import io.vertx.kotlin.config.configRetrieverOptionsOf
+import io.vertx.kotlin.config.configStoreOptionsOf
 import io.vertx.reactivex.config.ConfigRetriever
 import io.vertx.reactivex.core.Vertx
 import io.vertx.reactivex.ext.web.client.WebClient
@@ -35,9 +35,9 @@ class ApodRatingVerticleTest {
     fun deployVerticle(vertx: Vertx, testContext: VertxTestContext) {
         ConfigRetriever
             .create(
-                Vertx.vertx(), ConfigRetrieverOptions()
+                Vertx.vertx(), configRetrieverOptionsOf()
                     .addStore(
-                        ConfigStoreOptions(
+                        configStoreOptionsOf(
                             type = "file",
                             format = "properties",
                             config = JsonObject()
