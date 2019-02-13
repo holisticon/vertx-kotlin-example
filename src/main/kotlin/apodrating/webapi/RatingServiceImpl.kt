@@ -33,16 +33,13 @@ class RatingServiceImpl(val client: JDBCClient, override val coroutineContext: C
         resultHandler: Handler<AsyncResult<OperationResponse>>
     ) = runBlocking { getRating(apodId, resultHandler) }
 
-    private suspend fun getRating(
-        apodId: String,
-        resultHandler: Handler<AsyncResult<OperationResponse>>
-    ) {
+    private suspend fun getRating(apodId: String, resultHandler: Handler<AsyncResult<OperationResponse>>) {
         coroutineScope {
             client.queryWithParams(
                 "SELECT APOD_ID, AVG(VALUE) AS VALUE FROM RATING WHERE APOD_ID=? GROUP BY APOD_ID",
                 JsonArray().add(apodId)
-            ) { ar ->
-                with(ar.result()) {
+            ) {
+                with(it.result()) {
                     resultHandler.handle(
                         when (this.rows.size) {
                             1 -> Future.succeededFuture(
