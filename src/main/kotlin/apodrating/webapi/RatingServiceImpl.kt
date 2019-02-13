@@ -12,18 +12,13 @@ import io.vertx.ext.web.api.OperationResponse
 import io.vertx.kotlin.core.json.JsonArray
 import io.vertx.kotlin.core.json.array
 import io.vertx.kotlin.core.json.json
-import io.vertx.kotlin.ext.sql.queryWithParamsAwait
-import io.vertx.kotlin.ext.sql.updateWithParamsAwait
 import io.vertx.serviceproxy.ServiceException
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.runBlocking
 import mu.KLogging
 import org.apache.http.HttpStatus
-import kotlin.coroutines.CoroutineContext
 
-class RatingServiceImpl(val client: JDBCClient, override val coroutineContext: CoroutineContext) : RatingService,
-    CoroutineScope {
+class RatingServiceImpl(val client: JDBCClient) : RatingService {
 
     companion object : KLogging()
 
@@ -31,10 +26,10 @@ class RatingServiceImpl(val client: JDBCClient, override val coroutineContext: C
         apodId: String,
         context: OperationRequest,
         resultHandler: Handler<AsyncResult<OperationResponse>>
-    ) = runBlocking { getRating(apodId, resultHandler) }
+    ) = runBlocking { getRatingSuspend(apodId, resultHandler) }
 
-    private suspend fun getRating(apodId: String, resultHandler: Handler<AsyncResult<OperationResponse>>) {
-        coroutineScope {
+    private suspend fun getRatingSuspend(apodId: String, resultHandler: Handler<AsyncResult<OperationResponse>>) =
+        coroutineScope<Unit> {
             client.queryWithParams(
                 "SELECT APOD_ID, AVG(VALUE) AS VALUE FROM RATING WHERE APOD_ID=? GROUP BY APOD_ID",
                 JsonArray().add(apodId)
@@ -42,61 +37,55 @@ class RatingServiceImpl(val client: JDBCClient, override val coroutineContext: C
                 with(it.result()) {
                     resultHandler.handle(
                         when (this.rows.size) {
-                            1 -> Future.succeededFuture(
-                                OperationResponse.completedWithJson(asRating(this).toJsonObject())
-                            )
-
-                            0 -> Future.failedFuture(
+                            1 -> Future.succeededFuture(OperationResponse.completedWithJson(asRating(this).toJsonObject()))
+                            0 -> Future.succeededFuture(OperationResponse().setStatusCode(404).setStatusMessage("This apod does not exist."))
+                            else -> Future.failedFuture(
                                 ServiceException(
-                                    HttpStatus.SC_NOT_FOUND,
-                                    "A rating for this asApod entry does not exist"
+                                    HttpStatus.SC_INTERNAL_SERVER_ERROR,
+                                    "Server error"
                                 )
                             )
-                            else ->
-                                Future.failedFuture(
-                                    ServiceException(
-                                        HttpStatus.SC_INTERNAL_SERVER_ERROR,
-                                        "Server error"
-                                    )
-                                )
                         }
                     )
                 }
             }
         }
-    }
 
     override fun putRating(
         apodId: String,
         context: OperationRequest,
         resultHandler: Handler<AsyncResult<OperationResponse>>
     ) {
-        runBlocking {
-            val rating = asRatingRequest(context.params)
-            val result = this@RatingServiceImpl.client.queryWithParamsAwait(
+        runBlocking { putRatingSuspending(apodId, context, resultHandler) }
+    }
+
+    private suspend fun putRatingSuspending(
+        apodId: String,
+        context: OperationRequest,
+        resultHandler: Handler<AsyncResult<OperationResponse>>
+    ) =
+        coroutineScope<Unit> {
+            client.queryWithParams(
                 "SELECT ID FROM APOD WHERE ID=?",
-                json { array(apodId) })
-            when {
-                result.rows.size == 1 -> {
-                    client.updateWithParamsAwait(
-                        "INSERT INTO RATING (VALUE, APOD_ID) VALUES ?, ?",
-                        json { array(rating.rating, apodId) })
-                    Future.succeededFuture(
-                        with(OperationResponse()) {
-                            this.setStatusCode(HttpStatus.SC_NO_CONTENT)
+                json { array(apodId) }) {
+                with(it.result()) {
+                    resultHandler.handle(
+                        when (this.rows.size) {
+                            1 -> client.updateWithParams(
+                                "INSERT INTO RATING (VALUE, APOD_ID) VALUES ?, ?",
+                                json { array(asRatingRequest(context.params.getJsonObject("body")).rating, apodId) }
+                            ) {
+                            }.let {
+                                Future.succeededFuture(
+                                    OperationResponse().setStatusCode(HttpStatus.SC_NO_CONTENT)
+                                )
+                            }
+                            else -> Future.succeededFuture(OperationResponse().setStatusCode(404).setStatusMessage("This apod does not exist."))
                         }
                     )
                 }
-                else -> resultHandler.handle(
-                    Future.failedFuture(
-                        ServiceException(
-                            HttpStatus.SC_NOT_FOUND,
-                            "apod entry does not exist"
-                        )
-                    )
-                )
             }
+
         }
-    }
 }
 

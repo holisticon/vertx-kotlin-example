@@ -1,7 +1,7 @@
 package apodrating
 
 const val OPERATION_PUT_RATING = "putRating"
-const val OPERATION_GET_RATING = "getRating"
+const val OPERATION_GET_RATING = "getRatingSuspend"
 const val OPERATION_GET_APOD_FOR_DATE = "getApodForDate"
 const val OPERATION_GET_APODS = "getApods"
 const val OPERATION_POST_APOD = "postApod"

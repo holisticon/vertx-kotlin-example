@@ -85,7 +85,7 @@ class ApodRatingVerticle : CoroutineVerticle() {
             with(ServiceBinder(vertx).setAddress("rating_service.apod")) {
                 this.register(
                     RatingService::class.java,
-                    RatingServiceImpl(client, this@ApodRatingVerticle.coroutineContext)
+                    RatingServiceImpl(client)
                 )
             }
 
