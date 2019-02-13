@@ -10,6 +10,8 @@ import apodrating.model.asRating
 import apodrating.model.asRatingRequest
 import apodrating.model.isEmpty
 import apodrating.model.toJsonString
+import apodrating.webapi.RatingService
+import apodrating.webapi.RatingServiceImpl
 import apodrating.webserver.handleApiKeyValidation
 import apodrating.webserver.http2ServerOptions
 import apodrating.webserver.prepareHandlePostApod
@@ -36,6 +38,7 @@ import io.vertx.reactivex.core.http.HttpServerRequest
 import io.vertx.reactivex.ext.web.RoutingContext
 import io.vertx.reactivex.ext.web.api.contract.openapi3.OpenAPI3RouterFactory
 import io.vertx.reactivex.ext.web.handler.StaticHandler
+import io.vertx.serviceproxy.ServiceBinder
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import mu.KLogging
@@ -78,15 +81,26 @@ class ApodRatingVerticle : CoroutineVerticle() {
                 "INSERT INTO RATING (VALUE, APOD_ID) VALUES 7, 2"
 
             )
+
+            with(ServiceBinder(vertx).setAddress("rating_service.apod")) {
+                this.register(
+                    RatingService::class.java,
+                    RatingServiceImpl(client, this@ApodRatingVerticle.coroutineContext)
+                )
+            }
+
+
             client.getConnectionAwait().use { connection -> statements.forEach { connection.executeAwait(it) } }
             val http11Server =
                 OpenAPI3RouterFactory.rxCreate(rxVertx, "swagger.yaml").map {
+                    it.mountServicesFromExtensions()
                     rxVertx.createHttpServer()
                         .requestHandler(createRouter(it))
                         .listen(apodConfig.port)
                 }
             val http2Server =
                 OpenAPI3RouterFactory.rxCreate(rxVertx, "swagger.yaml").map {
+                    it.mountServicesFromExtensions()
                     rxVertx.createHttpServer(http2ServerOptions())
                         .requestHandler(createRouter(it))
                         .listen(apodConfig.h2Port)
@@ -112,9 +126,9 @@ class ApodRatingVerticle : CoroutineVerticle() {
      */
     private fun createRouter(routerFactory: OpenAPI3RouterFactory): Handler<HttpServerRequest> =
         routerFactory.apply {
-            coroutineHandler(operationId = OPERATION_PUT_RATING) { handlePutApodRating(it) }
+            //coroutineHandler(operationId = OPERATION_PUT_RATING) { handlePutApodRating(it) }
 
-            coroutineHandler(operationId = OPERATION_GET_RATING) { handleGetRating(it) }
+            //coroutineHandler(operationId = OPERATION_GET_RATING) { handleGetRating(it) }
 
             coroutineHandler(operationId = OPERATION_GET_APOD_FOR_DATE) { prepareHandleGetApodForDate(it) }
             coroutineHandler(operationId = OPERATION_GET_APOD_FOR_DATE) { handleGetApodForDate(it) }
