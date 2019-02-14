@@ -258,8 +258,8 @@ class ApodRatingVerticle : CoroutineVerticle() {
         val apodId = ctx.pathParam(PARAM_APOD_ID)
         val rating = asRatingRequest(ctx.bodyAsJson)
         val result = client.queryWithParamsAwait("SELECT ID FROM APOD WHERE ID=?", json { array(apodId) })
-        when {
-            result.rows.size == 1 -> {
+        when (result.rows.size) {
+            1 -> {
                 client.updateWithParamsAwait(
                     "INSERT INTO RATING (VALUE, APOD_ID) VALUES ?, ?",
                     json { array(rating.rating, apodId) })
