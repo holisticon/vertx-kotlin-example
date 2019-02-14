@@ -19,60 +19,55 @@ import kotlinx.coroutines.runBlocking
 import mu.KLogging
 import org.apache.http.HttpStatus
 
-class RatingServiceImpl(val client: JDBCClient) : RatingService {
+class RatingServiceImpl(
+    val client: JDBCClient,
+    private val jdbc: io.vertx.reactivex.ext.jdbc.JDBCClient = io.vertx.reactivex.ext.jdbc.JDBCClient(client)
+) : RatingService {
 
     companion object : KLogging()
-
-    private val jdbc = io.vertx.reactivex.ext.jdbc.JDBCClient(client)
 
     override fun getRating(
         apodId: String,
         context: OperationRequest,
         resultHandler: Handler<AsyncResult<OperationResponse>>
-    ) = runBlocking { getRatingSuspend(apodId, resultHandler) }
-
-    override fun putRating(
-        apodId: String,
-        context: OperationRequest,
-        resultHandler: Handler<AsyncResult<OperationResponse>>
-    ) {
-        runBlocking { putRatingSuspending(apodId, context, resultHandler) }
-    }
-
-    private suspend fun getRatingSuspend(apodId: String, resultHandler: Handler<AsyncResult<OperationResponse>>) =
+    ) = runBlocking {
         coroutineScope<Unit> {
             jdbc.rxQuerySingleWithParams(
                 "SELECT APOD_ID, AVG(VALUE) AS VALUE FROM RATING WHERE APOD_ID=? GROUP BY APOD_ID",
                 JsonArray().add(apodId)
             ).map { Rating(it.getInteger(0), it.getInteger(1)) }
                 .map { Future.succeededFuture(OperationResponse.completedWithJson(it.toJsonObject())) }
+                .doOnError { logger.error(it) { "Error during Rating query" } }
                 .switchIfEmpty(handleApodNotFound())
                 .subscribe(resultHandler::handle) { handleFailure(resultHandler, it) }
         }
+    }
 
-    private suspend fun putRatingSuspending(
+    override fun putRating(
         apodId: String,
         context: OperationRequest,
         resultHandler: Handler<AsyncResult<OperationResponse>>
-    ) =
-        coroutineScope<Unit> {
-            jdbc.rxQuerySingleWithParams("SELECT ID FROM APOD WHERE ID=?",
-                json { array(apodId) }
-            ).map {
-                it.getInteger(0)
-            }.flatMap {
-                jdbc.rxUpdateWithParams(
-                    "INSERT INTO RATING (VALUE, APOD_ID) VALUES ?, ?",
-                    json { array(asRatingRequest(context.params.getJsonObject("body")).rating, apodId) }
-                ).toMaybe()
-            }.map {
-                Future.succeededFuture(
-                    OperationResponse().setStatusCode(HttpStatus.SC_NO_CONTENT)
-                )
-            }.switchIfEmpty(handleApodNotFound())
-                .subscribe(resultHandler::handle) { handleFailure(resultHandler, it) }
+    ) {
+        runBlocking {
+            coroutineScope<Unit> {
+                jdbc.rxQuerySingleWithParams("SELECT ID FROM APOD WHERE ID=?",
+                    json { array(apodId) }
+                ).map {
+                    it.getInteger(0)
+                }.flatMap {
+                    jdbc.rxUpdateWithParams(
+                        "INSERT INTO RATING (VALUE, APOD_ID) VALUES ?, ?",
+                        json { array(asRatingRequest(context.params.getJsonObject("body")).rating, apodId) }
+                    ).toMaybe()
+                }
+                    .map { Future.succeededFuture(OperationResponse().setStatusCode(HttpStatus.SC_NO_CONTENT)) }
+                    .doOnError { logger.error(it) { "Error during Rating query" } }
+                    .switchIfEmpty(handleApodNotFound())
+                    .subscribe(resultHandler::handle) { handleFailure(resultHandler, it) }
 
+            }
         }
+    }
 
     private fun handleApodNotFound(): Maybe<Future<OperationResponse>>? {
         return Maybe.just(
