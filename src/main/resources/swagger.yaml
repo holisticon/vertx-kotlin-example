@@ -8,6 +8,9 @@ servers:
   - url: https://localhost:8443
 paths:
   /apod:
+    x-vertx-event-bus:
+      address: apod_query_service.apod
+      timeout: 2000
     post:
       summary: create an apod with the specified date
       operationId: postApod
@@ -45,6 +48,8 @@ paths:
     get:
       summary: get all apods
       operationId: getApods
+      x-vertx-event-bus:
+        method: getApods
       security:
         - ApiKeyAuth: []
       tags:

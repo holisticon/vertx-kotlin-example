@@ -1,15 +1,14 @@
 package apodrating
 
-import apodrating.model.Apod
 import apodrating.model.ApodRatingConfiguration
 import apodrating.model.Error
 import apodrating.model.apodQueryParameters
 import apodrating.model.asApod
 import apodrating.model.asApodRequest
-import apodrating.model.asRating
-import apodrating.model.asRatingRequest
 import apodrating.model.isEmpty
 import apodrating.model.toJsonString
+import apodrating.webapi.ApodQueryService
+import apodrating.webapi.ApodQueryServiceImpl
 import apodrating.webapi.RatingService
 import apodrating.webapi.RatingServiceImpl
 import apodrating.webserver.handleApiKeyValidation
@@ -21,15 +20,12 @@ import io.vertx.core.Future
 import io.vertx.core.Handler
 import io.vertx.core.json.JsonObject
 import io.vertx.ext.jdbc.JDBCClient
-import io.vertx.kotlin.core.json.Json
-import io.vertx.kotlin.core.json.JsonArray
 import io.vertx.kotlin.core.json.array
 import io.vertx.kotlin.core.json.get
 import io.vertx.kotlin.core.json.json
 import io.vertx.kotlin.coroutines.CoroutineVerticle
 import io.vertx.kotlin.ext.sql.executeAwait
 import io.vertx.kotlin.ext.sql.getConnectionAwait
-import io.vertx.kotlin.ext.sql.queryAwait
 import io.vertx.kotlin.ext.sql.queryWithParamsAwait
 import io.vertx.kotlin.ext.sql.updateWithParamsAwait
 import io.vertx.reactivex.core.Vertx
@@ -40,7 +36,6 @@ import io.vertx.reactivex.ext.web.api.contract.openapi3.OpenAPI3RouterFactory
 import io.vertx.reactivex.ext.web.handler.StaticHandler
 import io.vertx.serviceproxy.ServiceBinder
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import mu.KLogging
 import org.apache.http.HttpStatus
 
@@ -81,11 +76,14 @@ class ApodRatingVerticle : CoroutineVerticle() {
                 "INSERT INTO RATING (VALUE, APOD_ID) VALUES 7, 2"
 
             )
-
-            with(ServiceBinder(vertx).setAddress("rating_service.apod")) {
-                this.register(
+            with(ServiceBinder(vertx)) {
+                this.setAddress("rating_service.apod").register(
                     RatingService::class.java,
                     RatingServiceImpl(client)
+                )
+                this.setAddress("apod_query_service.apod").register(
+                    ApodQueryService::class.java,
+                    ApodQueryServiceImpl(rxVertx, client)
                 )
             }
 
@@ -126,14 +124,10 @@ class ApodRatingVerticle : CoroutineVerticle() {
      */
     private fun createRouter(routerFactory: OpenAPI3RouterFactory): Handler<HttpServerRequest> =
         routerFactory.apply {
-            //coroutineHandler(operationId = OPERATION_PUT_RATING) { handlePutApodRating(it) }
-
-            //coroutineHandler(operationId = OPERATION_GET_RATING) { handleGetRating(it) }
-
             coroutineHandler(operationId = OPERATION_GET_APOD_FOR_DATE) { prepareHandleGetApodForDate(it) }
             coroutineHandler(operationId = OPERATION_GET_APOD_FOR_DATE) { handleGetApodForDate(it) }
 
-            coroutineHandler(operationId = OPERATION_GET_APODS) { handleGetApods(it) }
+            //coroutineHandler(operationId = OPERATION_GET_APODS) { handleGetApods(it) }
 
             coroutineHandler(operationId = OPERATION_POST_APOD) { prepareHandlePostApod(it, client) }
             coroutineHandler(operationId = OPERATION_POST_APOD) { handlePostApod(it) }
@@ -172,48 +166,6 @@ class ApodRatingVerticle : CoroutineVerticle() {
                         ).toJsonString()
                     )
             }
-    }
-
-    /**
-     * Handle a GET request for all APODs in our database.
-     *
-     * @param ctx the vertx routing context
-     */
-    private suspend fun handleGetApods(ctx: RoutingContext) {
-        val apiKeyHeader = ctx.request().getHeader(API_KEY_HEADER)
-        val result = client.queryAwait("SELECT ID, DATE_STRING FROM APOD ")
-        var apods: List<JsonObject>? = null
-        when {
-            result.rows.size > 0 -> apods = result.rows
-            result.rows.size == 0 -> ctx.response().setStatusCode(HttpStatus.SC_OK).end(JsonArray().encode())
-            else -> ctx.response().setStatusCode(HttpStatus.SC_INTERNAL_SERVER_ERROR).end()
-        }
-        apods?.apply {
-            val singleApods = this
-                .map {
-                    runBlocking {
-                        rxVertx.eventBus().rxSend<JsonObject>(
-                            EVENTBUS_ADDRESS,
-                            apodQueryParameters(
-                                it.getInteger("ID").toString(),
-                                it.getString("DATE_STRING"),
-                                apiKeyHeader
-                            )
-                        ).map { msg -> asApod(msg.body()) }
-                    }
-                }
-                .toList()
-            Single.zip<Apod, List<Apod>>(singleApods) { emittedApodsAsJsonArray ->
-                emittedApodsAsJsonArray
-                    .filterIsInstance<Apod>()
-                    .filter { !it.isEmpty() }
-            }.subscribeOn(Schedulers.io())
-                .subscribe({ ctx.response().setStatusCode(HttpStatus.SC_OK).end(Json.array(it).encode()) })
-                {
-                    ctx.response().setStatusCode(HttpStatus.SC_INTERNAL_SERVER_ERROR)
-                        .end(Error(HttpStatus.SC_INTERNAL_SERVER_ERROR, "${it.message}").toJsonString())
-                }
-        }
     }
 
     /**
@@ -260,58 +212,6 @@ class ApodRatingVerticle : CoroutineVerticle() {
                     logger.error { it }
                     ctx.response().setStatusCode(HttpStatus.SC_INTERNAL_SERVER_ERROR).end()
                 }
-        }
-    }
-
-    /**
-     * Serve a POST request. Rate an apod
-     *
-     * @param ctx the vertx RoutingContext
-     */
-    private suspend fun handlePutApodRating(ctx: RoutingContext) {
-        val apodId = ctx.pathParam(PARAM_APOD_ID)
-        val rating = asRatingRequest(ctx.bodyAsJson)
-        val result = client.queryWithParamsAwait("SELECT ID FROM APOD WHERE ID=?", json { array(apodId) })
-        when {
-            result.rows.size == 1 -> {
-                client.updateWithParamsAwait(
-                    "INSERT INTO RATING (VALUE, APOD_ID) VALUES ?, ?",
-                    json { array(rating.rating, apodId) })
-                ctx.response().setStatusCode(HttpStatus.SC_NO_CONTENT).end()
-            }
-            else -> ctx.response().setStatusCode(HttpStatus.SC_NOT_FOUND).end(
-                Error(
-                    HttpStatus.SC_NOT_FOUND,
-                    "Apod does not exist."
-                ).toJsonString()
-            )
-        }
-    }
-
-    /**
-     * Serve a GET request. Get the current rating of an apod
-     *
-     * @param ctx the vertx RoutingContext
-     */
-    private suspend fun handleGetRating(ctx: RoutingContext) {
-        val apodId = ctx.pathParam(PARAM_APOD_ID)
-        val result = client.queryWithParamsAwait(
-            "SELECT APOD_ID, AVG(VALUE) AS VALUE FROM RATING WHERE APOD_ID=? GROUP BY APOD_ID",
-            json { array(apodId) })
-        when (result.rows.size) {
-            1 -> ctx.response().end(asRating(result).toJsonString())
-            0 -> ctx.response().setStatusCode(HttpStatus.SC_NOT_FOUND).end(
-                Error(
-                    HttpStatus.SC_NOT_FOUND,
-                    "A rating for this asApod entry does not exist"
-                ).toJsonString()
-            )
-            else -> ctx.response().setStatusCode(HttpStatus.SC_INTERNAL_SERVER_ERROR).end(
-                Error(
-                    HttpStatus.SC_INTERNAL_SERVER_ERROR,
-                    "Server error"
-                ).toJsonString()
-            )
         }
     }
 
