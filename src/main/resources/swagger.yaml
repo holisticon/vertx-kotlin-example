@@ -118,9 +118,9 @@ paths:
       timeout: 2000
     get:
       summary: get apod rating
-      operationId: getRatingSuspend
+      operationId: getRating
       x-vertx-event-bus:
-        method: getRatingSuspend
+        method: getRating
       tags:
         - apodrating
       parameters:
