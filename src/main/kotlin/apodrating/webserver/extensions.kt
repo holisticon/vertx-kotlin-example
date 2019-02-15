@@ -36,6 +36,9 @@ fun http2ServerOptions(): HttpServerOptions = HttpServerOptions()
     .setSsl(true)
     .setUseAlpn(true)
 
+/**
+ * Check if the required apod exists.
+ */
 suspend fun prepareHandlePostApod(ctx: RoutingContext, client: JDBCClient) {
     val apodRequest = asApodRequest(ctx.bodyAsJson)
     val resultSet = client.queryWithParamsAwait("SELECT DATE_STRING FROM APOD WHERE DATE_STRING=?",

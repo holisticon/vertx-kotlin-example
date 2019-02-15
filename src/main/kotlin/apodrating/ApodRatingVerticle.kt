@@ -79,11 +79,11 @@ class ApodRatingVerticle : CoroutineVerticle() {
             with(ServiceBinder(vertx)) {
                 this.setAddress("rating_service.apod").register(
                     RatingService::class.java,
-                    RatingServiceImpl(client)
+                    RatingServiceImpl(rxVertx, config)
                 )
                 this.setAddress("apod_query_service.apod").register(
                     ApodQueryService::class.java,
-                    ApodQueryServiceImpl(rxVertx, client)
+                    ApodQueryServiceImpl(rxVertx, config)
                 )
             }
 
@@ -117,11 +117,6 @@ class ApodRatingVerticle : CoroutineVerticle() {
         }
     }
 
-    /**
-     * Creates a router for our web servers.
-     * @param routerFactory the router factory
-     *
-     */
     private fun createRouter(routerFactory: OpenAPI3RouterFactory): Handler<HttpServerRequest> =
         routerFactory.apply {
             coroutineHandler(operationId = OPERATION_GET_APOD_FOR_DATE) { prepareHandleGetApodForDate(it) }
@@ -137,11 +132,6 @@ class ApodRatingVerticle : CoroutineVerticle() {
             route(STATIC_PATH).handler(StaticHandler.create())
         }
 
-    /**
-     * Handle a POST request for a single APOD identified by a date string.
-     *
-     * @param ctx the vertx routing context
-     */
     private suspend fun handlePostApod(ctx: RoutingContext) {
         val apodRequest = asApodRequest(ctx.bodyAsJson)
         val apiKeyHeader = ctx.request().getHeader(API_KEY_HEADER)
@@ -168,14 +158,6 @@ class ApodRatingVerticle : CoroutineVerticle() {
             }
     }
 
-    /**
-     * Check if the apod exists. If it does, store it in the context and let the next handler do the subsequent
-     * processing.
-     *
-     * If it does not exists or the request is somewhat erroneous, end the request here with the proper status code.
-     *
-     * @param ctx the vertx routing context
-     */
     private suspend fun prepareHandleGetApodForDate(ctx: RoutingContext) {
         val apodId = ctx.pathParam(PARAM_APOD_ID)
         val result =
@@ -187,11 +169,6 @@ class ApodRatingVerticle : CoroutineVerticle() {
         }
     }
 
-    /**
-     * Handle a GET request for a single APOD identified by a date string.
-     *
-     * @param ctx the vertx routing context
-     */
     private fun handleGetApodForDate(ctx: RoutingContext) {
         val jsonObject = ctx.get<JsonObject?>(CTX_FIELD_APOD)
         jsonObject?.apply {
