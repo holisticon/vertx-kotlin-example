@@ -2,10 +2,12 @@ package apodrating.webapi
 
 import apodrating.API_KEY_HEADER
 import apodrating.EVENTBUS_ADDRESS
+import apodrating.LOCATION_HEADER
 import apodrating.model.Apod
 import apodrating.model.ApodRatingConfiguration
 import apodrating.model.apodQueryParameters
 import apodrating.model.asApod
+import apodrating.model.asApodRequest
 import apodrating.model.isEmpty
 import io.reactivex.Maybe
 import io.reactivex.Single
@@ -19,6 +21,8 @@ import io.vertx.ext.web.api.OperationRequest
 import io.vertx.ext.web.api.OperationResponse
 import io.vertx.kotlin.core.json.Json
 import io.vertx.kotlin.core.json.array
+import io.vertx.kotlin.core.json.get
+import io.vertx.kotlin.core.json.json
 import io.vertx.reactivex.core.Vertx
 import io.vertx.reactivex.ext.jdbc.JDBCClient
 import io.vertx.serviceproxy.ServiceException
@@ -26,6 +30,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.apache.http.HttpStatus
+import java.sql.SQLIntegrityConstraintViolationException
 
 /**
  * Implementation of all APOD related queries.
@@ -38,6 +43,57 @@ class ApodQueryServiceImpl(
     private val apodConfig: ApodRatingConfiguration = ApodRatingConfiguration(config),
     private val jdbc: JDBCClient = JDBCClient.createShared(vertx, apodConfig.toJdbcConfig())
 ) : ApodQueryService {
+
+    /**
+     * Create a new apod in our database and return the resource's location in a http header.
+     */
+    override fun postApod(
+        body: JsonObject,
+        context: OperationRequest,
+        resultHandler: Handler<AsyncResult<OperationResponse>>
+    ) = runBlocking<Unit> {
+        val apodRequest = asApodRequest(body)
+        val apiKeyHeader = context.headers[API_KEY_HEADER]
+        withContext(Dispatchers.IO) {
+            jdbc.rxUpdateWithParams("INSERT INTO APOD (DATE_STRING) VALUES ?",
+                json { array(apodRequest.dateString) })
+        }.map { it.keys.get<Int>(0) }
+            .flatMap {
+                vertx.eventBus().rxSend<JsonObject>(
+                    EVENTBUS_ADDRESS,
+                    apodQueryParameters(it.toString(), apodRequest.dateString, apiKeyHeader)
+                )
+            }
+            .map { asApod(it.body()) }
+            .map {
+                Future.succeededFuture(
+                    OperationResponse().putHeader(
+                        LOCATION_HEADER,
+                        "/apod/${it.id}"
+                    ).setStatusCode(HttpStatus.SC_CREATED)
+                )
+            }
+            .onErrorReturn {
+                when (it) {
+                    is SQLIntegrityConstraintViolationException ->
+                        Future.succeededFuture(
+                            OperationResponse().setStatusCode(HttpStatus.SC_CONFLICT)
+                        )
+                    else -> Future.failedFuture(
+                        ServiceException(
+                            HttpStatus.SC_CONFLICT,
+                            it.localizedMessage
+                        )
+                    )
+
+                }
+
+            }
+            .subscribeOn(Schedulers.io())
+            .subscribe(resultHandler::handle) {
+                handleFailure(resultHandler, it, HttpStatus.SC_INTERNAL_SERVER_ERROR)
+            }
+    }
 
     /**
      * Handle a GET request for all APODs in our database.
@@ -72,17 +128,24 @@ class ApodQueryServiceImpl(
                 .map { Future.succeededFuture(OperationResponse.completedWithJson(Json.array(it))) }
                 .switchIfEmpty(Maybe.just(Future.succeededFuture(OperationResponse.completedWithJson(JsonArray()))))
                 .subscribeOn(Schedulers.io())
-                .subscribe(resultHandler::handle) { handleFailure(resultHandler, it) }
+                .subscribe(resultHandler::handle) {
+                    handleFailure(
+                        resultHandler,
+                        it,
+                        HttpStatus.SC_INTERNAL_SERVER_ERROR
+                    )
+                }
         }
 
     private fun handleFailure(
         resultHandler: Handler<AsyncResult<OperationResponse>>,
-        it: Throwable
+        it: Throwable,
+        errorCode: Int
     ) {
         resultHandler.handle(
             Future.failedFuture(
                 ServiceException(
-                    HttpStatus.SC_INTERNAL_SERVER_ERROR,
+                    errorCode,
                     it.localizedMessage
                 )
             )

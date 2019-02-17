@@ -1,14 +1,9 @@
 package apodrating.webserver
 
 import apodrating.model.Error
-import apodrating.model.asApodRequest
 import apodrating.model.toJsonString
 import io.vertx.core.http.HttpServerOptions
-import io.vertx.ext.jdbc.JDBCClient
-import io.vertx.kotlin.core.json.array
-import io.vertx.kotlin.core.json.json
 import io.vertx.kotlin.core.net.pemKeyCertOptionsOf
-import io.vertx.kotlin.ext.sql.queryWithParamsAwait
 import io.vertx.reactivex.ext.web.RoutingContext
 import org.apache.http.HttpStatus
 
@@ -36,20 +31,3 @@ fun http2ServerOptions(): HttpServerOptions = HttpServerOptions()
     .setSsl(true)
     .setUseAlpn(true)
 
-/**
- * Check if the required apod exists.
- */
-suspend fun prepareHandlePostApod(ctx: RoutingContext, client: JDBCClient) {
-    val apodRequest = asApodRequest(ctx.bodyAsJson)
-    val resultSet = client.queryWithParamsAwait("SELECT DATE_STRING FROM APOD WHERE DATE_STRING=?",
-        json { array(apodRequest.dateString) })
-    when {
-        resultSet.rows.size == 0 -> ctx.next()
-        else -> ctx.response().setStatusCode(HttpStatus.SC_CONFLICT).end(
-            Error(
-                HttpStatus.SC_CONFLICT,
-                "Entry already exists"
-            ).toJsonString()
-        )
-    }
-}

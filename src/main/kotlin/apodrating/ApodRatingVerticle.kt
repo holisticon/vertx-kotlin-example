@@ -1,10 +1,8 @@
 package apodrating
 
 import apodrating.model.ApodRatingConfiguration
-import apodrating.model.Error
 import apodrating.model.apodQueryParameters
 import apodrating.model.asApod
-import apodrating.model.asApodRequest
 import apodrating.model.isEmpty
 import apodrating.model.toJsonString
 import apodrating.webapi.ApodQueryService
@@ -13,7 +11,6 @@ import apodrating.webapi.RatingService
 import apodrating.webapi.RatingServiceImpl
 import apodrating.webserver.handleApiKeyValidation
 import apodrating.webserver.http2ServerOptions
-import apodrating.webserver.prepareHandlePostApod
 import io.reactivex.Single
 import io.reactivex.schedulers.Schedulers
 import io.vertx.core.Future
@@ -21,13 +18,11 @@ import io.vertx.core.Handler
 import io.vertx.core.json.JsonObject
 import io.vertx.ext.jdbc.JDBCClient
 import io.vertx.kotlin.core.json.array
-import io.vertx.kotlin.core.json.get
 import io.vertx.kotlin.core.json.json
 import io.vertx.kotlin.coroutines.CoroutineVerticle
 import io.vertx.kotlin.ext.sql.executeAwait
 import io.vertx.kotlin.ext.sql.getConnectionAwait
 import io.vertx.kotlin.ext.sql.queryWithParamsAwait
-import io.vertx.kotlin.ext.sql.updateWithParamsAwait
 import io.vertx.reactivex.core.Vertx
 import io.vertx.reactivex.core.http.HttpServer
 import io.vertx.reactivex.core.http.HttpServerRequest
@@ -73,8 +68,8 @@ class ApodRatingVerticle : CoroutineVerticle() {
                 "INSERT INTO RATING (VALUE, APOD_ID) VALUES 7, 2",
                 "INSERT INTO RATING (VALUE, APOD_ID) VALUES 8, 0",
                 "INSERT INTO RATING (VALUE, APOD_ID) VALUES 5, 1",
-                "INSERT INTO RATING (VALUE, APOD_ID) VALUES 7, 2"
-
+                "INSERT INTO RATING (VALUE, APOD_ID) VALUES 7, 2",
+                "ALTER TABLE APOD ADD CONSTRAINT APOD_UNIQUE UNIQUE(DATE_STRING)"
             )
             with(ServiceBinder(vertx)) {
                 this.setAddress("rating_service.apod").register(
@@ -122,41 +117,10 @@ class ApodRatingVerticle : CoroutineVerticle() {
             coroutineHandler(operationId = OPERATION_GET_APOD_FOR_DATE) { prepareHandleGetApodForDate(it) }
             coroutineHandler(operationId = OPERATION_GET_APOD_FOR_DATE) { handleGetApodForDate(it) }
 
-            //coroutineHandler(operationId = OPERATION_GET_APODS) { handleGetApods(it) }
-
-            coroutineHandler(operationId = OPERATION_POST_APOD) { prepareHandlePostApod(it, client) }
-            coroutineHandler(operationId = OPERATION_POST_APOD) { handlePostApod(it) }
-
             coroutineSecurityHandler(API_AUTH_KEY) { handleApiKeyValidation(it, apiKey) }
         }.router.apply {
             route(STATIC_PATH).handler(StaticHandler.create())
         }
-
-    private suspend fun handlePostApod(ctx: RoutingContext) {
-        val apodRequest = asApodRequest(ctx.bodyAsJson)
-        val apiKeyHeader = ctx.request().getHeader(API_KEY_HEADER)
-        val updateResult = client.updateWithParamsAwait(
-            "INSERT INTO APOD (DATE_STRING) VALUES ?",
-            json { array(apodRequest.dateString) })
-        val newId = updateResult.keys.get<Int>(0)
-        rxVertx.eventBus().rxSend<JsonObject>(
-            EVENTBUS_ADDRESS,
-            apodQueryParameters(newId.toString(), apodRequest.dateString, apiKeyHeader)
-        ).map { asApod(it.body()) }
-            .subscribe({
-                ctx.response().setStatusCode(HttpStatus.SC_CREATED)
-                    .putHeader(LOCATION_HEADER, "/apod/$newId")
-                    .end()
-            }) {
-                ctx.response().setStatusCode(HttpStatus.SC_INTERNAL_SERVER_ERROR)
-                    .end(
-                        Error(
-                            HttpStatus.SC_INTERNAL_SERVER_ERROR,
-                            "Could not create apod entry. ${it.message}"
-                        ).toJsonString()
-                    )
-            }
-    }
 
     private suspend fun prepareHandleGetApodForDate(ctx: RoutingContext) {
         val apodId = ctx.pathParam(PARAM_APOD_ID)

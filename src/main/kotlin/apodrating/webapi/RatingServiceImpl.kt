@@ -52,7 +52,6 @@ class RatingServiceImpl(
             )
         }.map { Rating(it.getInteger(0), it.getInteger(1)) }
             .map { Future.succeededFuture(OperationResponse.completedWithJson(it.toJsonObject())) }
-            .doOnError { logger.error(it) { "Error during Rating query" } }
             .switchIfEmpty(handleApodNotFound())
             .subscribe(resultHandler::handle) { handleFailure(resultHandler, it) }
     }
@@ -82,7 +81,6 @@ class RatingServiceImpl(
             }
         }
             .map { Future.succeededFuture(OperationResponse().setStatusCode(HttpStatus.SC_NO_CONTENT)) }
-            .doOnError { logger.error(it) { "Error during Rating query" } }
             .switchIfEmpty(handleApodNotFound())
             .subscribe(resultHandler::handle) { handleFailure(resultHandler, it) }
 
