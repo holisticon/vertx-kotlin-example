@@ -88,9 +88,9 @@ class ApodRemoteProxyVerticle : CoroutineVerticle() {
 
             rxVertx.eventBus()
                 .consumer<JsonObject>(EVENTBUS_ADDRESS) { message ->
-                    val id: String = message.body().getString("id")
-                    val dateString: String = message.body().getString("date")
-                    val nasaApiKey: String = message.body().getString("nasaApiKey")
+                    val id: String = message.body().getString(FIELD_ID)
+                    val dateString: String = message.body().getString(FIELD_DATE)
+                    val nasaApiKey: String = message.body().getString(FIELD_NASA_API_KEY)
                     performApodQuery(id, dateString, nasaApiKey).subscribe({
                         when {
                             it == null || it.isEmpty() -> message.fail(
@@ -135,9 +135,9 @@ class ApodRemoteProxyVerticle : CoroutineVerticle() {
     private fun rxSendGet(date: String, nasaApiKey: String, apodId: String): Single<Apod> =
         webClient.getAbs(apodConfig.nasaApiHost)
             .uri(apodConfig.nasaApiPath)
-            .addQueryParam("date", date)
-            .addQueryParam("api_key", nasaApiKey)
-            .addQueryParam("hd", true.toString())
+            .addQueryParam(FIELD_DATE, date)
+            .addQueryParam(PARAM_API_KEY, nasaApiKey)
+            .addQueryParam(PARAM_HD, true.toString())
             .expect(ResponsePredicate.SC_SUCCESS)
             .expect(ResponsePredicate.JSON)
             .`as`(BodyCodec.jsonObject())

@@ -2,6 +2,10 @@
 
 package apodrating.model
 
+import apodrating.FIELD_DATE_STRING
+import apodrating.FIELD_ID
+import apodrating.FIELD_RATING
+import apodrating.FIELD_TITLE
 import io.vertx.core.DeploymentOptions
 import io.vertx.core.json.JsonObject
 import io.vertx.ext.sql.ResultSet
@@ -28,7 +32,7 @@ fun Apod.toJsonString(): String = this.toJsonObject().encode()
 fun asApod(id: String, jsonObject: JsonObject): Apod = Apod(
     id = id,
     dateString = jsonObject.getString("date"),
-    title = jsonObject.getString("title"),
+    title = jsonObject.getString(FIELD_TITLE),
     imageUriHd = jsonObject.getString("hdurl")
 )
 
@@ -36,9 +40,9 @@ fun asApod(id: String, jsonObject: JsonObject): Apod = Apod(
  * Create a new asApod from a JsonObject.
  */
 fun asApod(jsonObject: JsonObject): Apod = Apod(
-    id = jsonObject.getString("id"),
-    dateString = jsonObject.getString("dateString"),
-    title = jsonObject.getString("title"),
+    id = jsonObject.getString(FIELD_ID),
+    dateString = jsonObject.getString(FIELD_DATE_STRING),
+    title = jsonObject.getString(FIELD_TITLE),
     imageUriHd = jsonObject.getString("imageUriHd")
 )
 
@@ -55,7 +59,8 @@ fun Apod.isEmpty() = this == emptyApod()
 /**
  * Create an asApodRequest from a JsonObject
  */
-fun asApodRequest(jsonObject: JsonObject): ApodRequest = ApodRequest(dateString = jsonObject.getString("dateString"))
+fun asApodRequest(jsonObject: JsonObject): ApodRequest =
+    ApodRequest(dateString = jsonObject.getString(FIELD_DATE_STRING))
 
 /**
  * Convert this asRating into a JsonObject.
@@ -71,19 +76,19 @@ fun Rating.toJsonString(): String = this.toJsonObject().encode()
  * Create a asRating from a JsonObject
  */
 fun asRating(jsonObject: JsonObject): Rating =
-    Rating(id = jsonObject.getInteger("id"), rating = jsonObject.getInteger("rating"))
+    Rating(id = jsonObject.getInteger(FIELD_ID), rating = jsonObject.getInteger(FIELD_RATING))
 
 /**
  * Create a asRating from a ResultSet
  */
 fun asRating(result: ResultSet): Rating = asRating(json {
-    obj("id" to result.rows[0]["APOD_ID"], "rating" to result.rows[0]["VALUE"])
+    obj(FIELD_ID to result.rows[0]["APOD_ID"], FIELD_RATING to result.rows[0]["VALUE"])
 })
 
 /**
  * Create a asRatingRequest from a JsonObject
  */
-fun asRatingRequest(jsonObject: JsonObject): RatingRequest = RatingRequest(rating = jsonObject.getInteger("rating"))
+fun asRatingRequest(jsonObject: JsonObject): RatingRequest = RatingRequest(rating = jsonObject.getInteger(FIELD_RATING))
 
 /**
  * Convert this Error into a JsonObject.
@@ -106,6 +111,6 @@ fun deploymentOptionsFromEnv(vertx: Vertx): DeploymentOptions = configRetrieverO
 /**
  * Get a JsonObject for an apod query that is going to be sent over the eventbus.
  */
-fun apodQueryParameters(id: String, date: String, apiKey: String): JsonObject = JsonObject().put("id", id)
+fun apodQueryParameters(id: String, date: String, apiKey: String): JsonObject = JsonObject().put(FIELD_ID, id)
     .put("date", date)
     .put("nasaApiKey", apiKey)
