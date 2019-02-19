@@ -25,7 +25,6 @@ import io.vertx.kotlin.core.json.get
 import io.vertx.kotlin.core.json.json
 import io.vertx.reactivex.core.Vertx
 import io.vertx.reactivex.ext.jdbc.JDBCClient
-import io.vertx.serviceproxy.ServiceException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -66,28 +65,13 @@ class ApodQueryServiceImpl(
             }
             .map { asApod(it.body()) }
             .map {
-                Future.succeededFuture(
-                    OperationResponse().putHeader(
-                        LOCATION_HEADER,
-                        "/apod/${it.id}"
-                    ).setStatusCode(HttpStatus.SC_CREATED)
-                )
+                succeed(HttpStatus.SC_CREATED, LOCATION_HEADER, "/apod/${it.id}")
             }
             .onErrorReturn {
                 when (it) {
-                    is SQLIntegrityConstraintViolationException ->
-                        Future.succeededFuture(
-                            OperationResponse().setStatusCode(HttpStatus.SC_CONFLICT)
-                        )
-                    else -> Future.failedFuture(
-                        ServiceException(
-                            HttpStatus.SC_CONFLICT,
-                            it.localizedMessage
-                        )
-                    )
-
+                    is SQLIntegrityConstraintViolationException -> succeed(HttpStatus.SC_CONFLICT)
+                    else -> fail(HttpStatus.SC_CONFLICT, it.localizedMessage)
                 }
-
             }
             .subscribeOn(Schedulers.io())
             .subscribe(resultHandler::handle) {
@@ -129,11 +113,7 @@ class ApodQueryServiceImpl(
                 .switchIfEmpty(Maybe.just(Future.succeededFuture(OperationResponse.completedWithJson(JsonArray()))))
                 .subscribeOn(Schedulers.io())
                 .subscribe(resultHandler::handle) {
-                    handleFailure(
-                        resultHandler,
-                        it,
-                        HttpStatus.SC_INTERNAL_SERVER_ERROR
-                    )
+                    handleFailure(resultHandler, it, HttpStatus.SC_INTERNAL_SERVER_ERROR)
                 }
         }
 
@@ -142,14 +122,7 @@ class ApodQueryServiceImpl(
         it: Throwable,
         errorCode: Int
     ) {
-        resultHandler.handle(
-            Future.failedFuture(
-                ServiceException(
-                    errorCode,
-                    it.localizedMessage
-                )
-            )
-        )
+        resultHandler.handle(fail(errorCode, it.localizedMessage))
     }
 }
 

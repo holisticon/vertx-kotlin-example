@@ -16,7 +16,6 @@ import io.vertx.kotlin.core.json.array
 import io.vertx.kotlin.core.json.json
 import io.vertx.reactivex.core.Vertx
 import io.vertx.reactivex.ext.jdbc.JDBCClient
-import io.vertx.serviceproxy.ServiceException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -80,34 +79,21 @@ class RatingServiceImpl(
                 }
             }
         }
-            .map { Future.succeededFuture(OperationResponse().setStatusCode(HttpStatus.SC_NO_CONTENT)) }
+            .map { succeed(HttpStatus.SC_NO_CONTENT) }
             .switchIfEmpty(handleApodNotFound())
             .subscribe(resultHandler::handle) { handleFailure(resultHandler, it) }
 
     }
 
     private fun handleApodNotFound(): Maybe<Future<OperationResponse>>? {
-        return Maybe.just(
-            Future.succeededFuture(
-                OperationResponse().setStatusCode(HttpStatus.SC_NOT_FOUND).setStatusMessage(
-                    "This apod does not exist."
-                )
-            )
-        )
+        return Maybe.just(succeed(HttpStatus.SC_NOT_FOUND))
     }
 
     private fun handleFailure(
         resultHandler: Handler<AsyncResult<OperationResponse>>,
         it: Throwable
     ) {
-        resultHandler.handle(
-            Future.failedFuture(
-                ServiceException(
-                    HttpStatus.SC_INTERNAL_SERVER_ERROR,
-                    it.localizedMessage
-                )
-            )
-        )
+        resultHandler.handle(fail(HttpStatus.SC_INTERNAL_SERVER_ERROR, it.localizedMessage))
     }
 }
 
