@@ -2,8 +2,10 @@
 
 package apodrating.model
 
+import apodrating.FIELD_DATE
 import apodrating.FIELD_DATE_STRING
 import apodrating.FIELD_ID
+import apodrating.FIELD_NASA_API_KEY
 import apodrating.FIELD_RATING
 import apodrating.FIELD_TITLE
 import io.vertx.core.DeploymentOptions
@@ -112,5 +114,5 @@ fun deploymentOptionsFromEnv(vertx: Vertx): DeploymentOptions = configRetrieverO
  * Get a JsonObject for an apod query that is going to be sent over the eventbus.
  */
 fun apodQueryParameters(id: String, date: String, apiKey: String): JsonObject = JsonObject().put(FIELD_ID, id)
-    .put("date", date)
-    .put("nasaApiKey", apiKey)
+    .put(FIELD_DATE, date)
+    .put(FIELD_NASA_API_KEY, apiKey)

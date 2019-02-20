@@ -19,11 +19,7 @@ class MainVerticle : AbstractVerticle() {
         val startupTime = System.currentTimeMillis()
         Single.zip<String, List<String>>(
             listOf(
-                vertx.rxDeployVerticle(ApodRatingVerticle::class.java.canonicalName, deploymentOptionsFromEnv(vertx)),
-                vertx.rxDeployVerticle(
-                    ApodRemoteProxyVerticle::class.java.canonicalName,
-                    deploymentOptionsFromEnv(vertx)
-                )
+                vertx.rxDeployVerticle(ApodRatingVerticle::class.java.canonicalName, deploymentOptionsFromEnv(vertx))
             )
         ) { it.filterIsInstance<String>() }
             .subscribeOn(Schedulers.computation())

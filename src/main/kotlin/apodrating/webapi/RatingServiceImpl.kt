@@ -4,7 +4,6 @@ import apodrating.model.ApodRatingConfiguration
 import apodrating.model.Rating
 import apodrating.model.asRatingRequest
 import apodrating.model.toJsonObject
-import io.reactivex.Maybe
 import io.vertx.core.AsyncResult
 import io.vertx.core.Future
 import io.vertx.core.Handler
@@ -83,17 +82,6 @@ class RatingServiceImpl(
             .switchIfEmpty(handleApodNotFound())
             .subscribe(resultHandler::handle) { handleFailure(resultHandler, it) }
 
-    }
-
-    private fun handleApodNotFound(): Maybe<Future<OperationResponse>>? {
-        return Maybe.just(succeed(HttpStatus.SC_NOT_FOUND))
-    }
-
-    private fun handleFailure(
-        resultHandler: Handler<AsyncResult<OperationResponse>>,
-        it: Throwable
-    ) {
-        resultHandler.handle(fail(HttpStatus.SC_INTERNAL_SERVER_ERROR, it.localizedMessage))
     }
 }
 

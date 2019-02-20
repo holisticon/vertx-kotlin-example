@@ -1,15 +1,16 @@
 package apodrating.webapi
 
 import apodrating.API_KEY_HEADER
-import apodrating.EVENTBUS_ADDRESS
 import apodrating.LOCATION_HEADER
+import apodrating.REMOTE_PROXY_SERVICE_ADDRESS
 import apodrating.model.Apod
 import apodrating.model.ApodRatingConfiguration
-import apodrating.model.apodQueryParameters
 import apodrating.model.asApod
 import apodrating.model.asApodRequest
 import apodrating.model.isEmpty
 import apodrating.model.toJsonObject
+import apodrating.remoteproxy.createRemoteProxyServiceProxy
+import apodrating.remoteproxy.reactivex.RemoteProxyService
 import io.reactivex.Maybe
 import io.reactivex.Single
 import io.reactivex.schedulers.Schedulers
@@ -47,6 +48,8 @@ class ApodQueryServiceImpl(
 
     companion object : KLogging()
 
+    private val proxyService: RemoteProxyService = createRemoteProxyServiceProxy(vertx, REMOTE_PROXY_SERVICE_ADDRESS)
+
     /**
      * Handle a GET request for a single APOD in our database.
      */
@@ -60,16 +63,13 @@ class ApodQueryServiceImpl(
                 json { array(apodId) }
             )
         }.flatMap {
-            vertx.eventBus().rxSend<JsonObject>(
-                EVENTBUS_ADDRESS,
-                apodQueryParameters(
-                    it.getInteger(0).toString(),
-                    it.getString(1),
-                    context.headers.get(API_KEY_HEADER)
-                )
+            proxyService.rxPerformApodQuery(
+                it.getInteger(0).toString(),
+                it.getString(1),
+                context.headers.get(API_KEY_HEADER)
             ).toMaybe()
         }
-            .map { succeed(HttpStatus.SC_OK, asApod(it.body()).toJsonObject()) }
+            .map { succeed(HttpStatus.SC_OK, asApod(it).toJsonObject()) }
             .switchIfEmpty(handleApodNotFound())
             .subscribe(resultHandler::handle) { handleFailure(resultHandler, it) }
     }
@@ -89,12 +89,13 @@ class ApodQueryServiceImpl(
                 json { array(apodRequest.dateString) })
         }.map { it.keys.get<Int>(0) }
             .flatMap {
-                vertx.eventBus().rxSend<JsonObject>(
-                    EVENTBUS_ADDRESS,
-                    apodQueryParameters(it.toString(), apodRequest.dateString, apiKeyHeader)
+                proxyService.rxPerformApodQuery(
+                    it.toString(),
+                    apodRequest.dateString,
+                    apiKeyHeader
                 )
             }
-            .map { asApod(it.body()) }
+            .map { asApod(it) }
             .map {
                 succeed(HttpStatus.SC_CREATED, LOCATION_HEADER, "/apod/${it.id}")
             }
@@ -122,14 +123,11 @@ class ApodQueryServiceImpl(
                 .map {
                     it.map {
                         runBlocking {
-                            vertx.eventBus().rxSend<JsonObject>(
-                                EVENTBUS_ADDRESS,
-                                apodQueryParameters(
-                                    it.getInteger("ID").toString(),
-                                    it.getString("DATE_STRING"),
-                                    context.headers[API_KEY_HEADER]
-                                )
-                            ).map { msg -> asApod(msg.body()) }
+                            proxyService.rxPerformApodQuery(
+                                it.getInteger("ID").toString(),
+                                it.getString("DATE_STRING"),
+                                context.headers.get(API_KEY_HEADER)
+                            ).map { msg -> asApod(msg) }
                         }
                     }.toList()
                 }
@@ -147,24 +145,5 @@ class ApodQueryServiceImpl(
                     handleFailure(resultHandler, it, HttpStatus.SC_INTERNAL_SERVER_ERROR)
                 }
         }
-
-    private fun handleFailure(
-        resultHandler: Handler<AsyncResult<OperationResponse>>,
-        it: Throwable,
-        errorCode: Int
-    ) {
-        resultHandler.handle(fail(errorCode, it.localizedMessage))
-    }
-
-    private fun handleApodNotFound(): Maybe<Future<OperationResponse>>? {
-        return Maybe.just(succeed(HttpStatus.SC_NOT_FOUND))
-    }
-
-    private fun handleFailure(
-        resultHandler: Handler<AsyncResult<OperationResponse>>,
-        it: Throwable
-    ) {
-        resultHandler.handle(fail(HttpStatus.SC_INTERNAL_SERVER_ERROR, it.localizedMessage))
-    }
 }
 

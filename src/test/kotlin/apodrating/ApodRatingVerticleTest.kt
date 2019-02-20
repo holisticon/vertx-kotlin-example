@@ -52,10 +52,6 @@ class ApodRatingVerticleTest {
                         vertx.rxDeployVerticle(
                             ApodRatingVerticle(),
                             DeploymentOptions(JsonObject().put("config", config))
-                        ),
-                        vertx.rxDeployVerticle(
-                            ApodRemoteProxyVerticle(),
-                            DeploymentOptions(JsonObject().put("config", config))
                         )
                     )
                 ) { it.filterIsInstance<String>() }

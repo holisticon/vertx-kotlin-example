@@ -3,6 +3,8 @@ package apodrating
 import apodrating.model.ApodRatingConfiguration
 import apodrating.model.Error
 import apodrating.model.toJsonString
+import apodrating.remoteproxy.RemoteProxyService
+import apodrating.remoteproxy.RemoteProxyServiceImpl
 import apodrating.webapi.ApodQueryService
 import apodrating.webapi.ApodQueryServiceImpl
 import apodrating.webapi.RatingService
@@ -66,11 +68,13 @@ class ApodRatingVerticle : CoroutineVerticle() {
                 "ALTER TABLE APOD ADD CONSTRAINT APOD_UNIQUE UNIQUE(DATE_STRING)"
             )
             with(ServiceBinder(vertx)) {
-                this.setAddress("rating_service.apod").register(
+                this.setAddress(RATING_SERVICE_ADDRESS).register(
                     RatingService::class.java,
                     RatingServiceImpl(rxVertx, config)
                 )
-                this.setAddress("apod_query_service.apod").register(
+                this.setAddress(REMOTE_PROXY_SERVICE_ADDRESS)
+                    .register(RemoteProxyService::class.java, RemoteProxyServiceImpl(rxVertx, config))
+                this.setAddress(APOD_QUERY_ADDRESS).register(
                     ApodQueryService::class.java,
                     ApodQueryServiceImpl(rxVertx, config)
                 )
