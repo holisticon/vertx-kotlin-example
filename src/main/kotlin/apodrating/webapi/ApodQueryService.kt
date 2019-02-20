@@ -18,6 +18,16 @@ import io.vertx.ext.web.api.generator.WebApiServiceGen
 interface ApodQueryService {
 
     /**
+     * Handle a GET request for a single APOD in our database.
+     *
+     */
+    fun getApodForDate(
+        apodId: String,
+        context: OperationRequest,
+        resultHandler: Handler<AsyncResult<OperationResponse>>
+    )
+
+    /**
      * Handle a GET request for all APODs in our database.
      *
      */

@@ -1,28 +1,22 @@
 package apodrating
 
 import apodrating.model.ApodRatingConfiguration
-import apodrating.model.apodQueryParameters
-import apodrating.model.asApod
-import apodrating.model.isEmpty
+import apodrating.model.Error
 import apodrating.model.toJsonString
 import apodrating.webapi.ApodQueryService
 import apodrating.webapi.ApodQueryServiceImpl
 import apodrating.webapi.RatingService
 import apodrating.webapi.RatingServiceImpl
-import apodrating.webserver.handleApiKeyValidation
-import apodrating.webserver.http2ServerOptions
 import io.reactivex.Single
 import io.reactivex.schedulers.Schedulers
 import io.vertx.core.Future
 import io.vertx.core.Handler
-import io.vertx.core.json.JsonObject
+import io.vertx.core.http.HttpServerOptions
 import io.vertx.ext.jdbc.JDBCClient
-import io.vertx.kotlin.core.json.array
-import io.vertx.kotlin.core.json.json
+import io.vertx.kotlin.core.net.pemKeyCertOptionsOf
 import io.vertx.kotlin.coroutines.CoroutineVerticle
 import io.vertx.kotlin.ext.sql.executeAwait
 import io.vertx.kotlin.ext.sql.getConnectionAwait
-import io.vertx.kotlin.ext.sql.queryWithParamsAwait
 import io.vertx.reactivex.core.Vertx
 import io.vertx.reactivex.core.http.HttpServer
 import io.vertx.reactivex.core.http.HttpServerRequest
@@ -82,7 +76,6 @@ class ApodRatingVerticle : CoroutineVerticle() {
                 )
             }
 
-
             client.getConnectionAwait().use { connection -> statements.forEach { connection.executeAwait(it) } }
             val http11Server =
                 OpenAPI3RouterFactory.rxCreate(rxVertx, "swagger.yaml").map {
@@ -114,54 +107,9 @@ class ApodRatingVerticle : CoroutineVerticle() {
 
     private fun createRouter(routerFactory: OpenAPI3RouterFactory): Handler<HttpServerRequest> =
         routerFactory.apply {
-            coroutineHandler(operationId = OPERATION_GET_APOD_FOR_DATE) { prepareHandleGetApodForDate(it) }
-            coroutineHandler(operationId = OPERATION_GET_APOD_FOR_DATE) { handleGetApodForDate(it) }
-
             coroutineSecurityHandler(API_AUTH_KEY) { handleApiKeyValidation(it, apiKey) }
         }.router.apply {
             route(STATIC_PATH).handler(StaticHandler.create())
-        }
-
-    private suspend fun prepareHandleGetApodForDate(ctx: RoutingContext) {
-        val apodId = ctx.pathParam(PARAM_APOD_ID)
-        val result =
-            client.queryWithParamsAwait("SELECT ID, DATE_STRING FROM APOD WHERE ID=?", json { array(apodId) })
-        when (result.rows.size) {
-            1 -> ctx.put(CTX_FIELD_APOD, result.rows[0]).next()
-            0 -> ctx.response().setStatusCode(HttpStatus.SC_NOT_FOUND).end()
-            else -> ctx.response().setStatusCode(HttpStatus.SC_BAD_REQUEST).end()
-        }
-    }
-
-    private fun handleGetApodForDate(ctx: RoutingContext) {
-        val jsonObject = ctx.get<JsonObject?>(CTX_FIELD_APOD)
-        jsonObject?.apply {
-            rxVertx.eventBus().rxSend<JsonObject>(
-                EVENTBUS_ADDRESS,
-                apodQueryParameters(
-                    this.getInteger("ID").toString(),
-                    this.getString("DATE_STRING"),
-                    ctx.request().getHeader(API_KEY_HEADER)
-                )
-            ).map { asApod(it.body()) }
-                .subscribe({
-                    when {
-                        it == null || it.isEmpty() -> ctx.response().setStatusCode(HttpStatus.SC_SERVICE_UNAVAILABLE).end()
-                        else -> ctx.response().setStatusCode(HttpStatus.SC_OK).end(it.toJsonString())
-                    }
-                }) {
-                    logger.error { it }
-                    ctx.response().setStatusCode(HttpStatus.SC_INTERNAL_SERVER_ERROR).end()
-                }
-        }
-    }
-
-    private fun OpenAPI3RouterFactory.coroutineHandler(
-        operationId: String,
-        function: suspend (RoutingContext) -> Unit
-    ) =
-        addHandlerByOperationId(operationId) {
-            launch { function(it) }
         }
 
     private fun OpenAPI3RouterFactory.coroutineSecurityHandler(
@@ -171,4 +119,22 @@ class ApodRatingVerticle : CoroutineVerticle() {
         addSecurityHandler(securitySchemaName) {
             launch { function(it) }
         }
+
+    private fun handleApiKeyValidation(ctx: RoutingContext, apiKey: String) =
+        when (ctx.request().getHeader("X-API-KEY")) {
+            apiKey -> ctx.next()
+            else -> ctx.response().setStatusCode(HttpStatus.SC_UNAUTHORIZED).end(
+                Error(
+                    HttpStatus.SC_UNAUTHORIZED,
+                    "Api key not valid"
+                ).toJsonString()
+            )
+        }
+
+    private fun http2ServerOptions(): HttpServerOptions = HttpServerOptions()
+        .setKeyCertOptions(
+            pemKeyCertOptionsOf(certPath = "tls/server-cert.pem", keyPath = "tls/server-key.pem")
+        )
+        .setSsl(true)
+        .setUseAlpn(true)
 }

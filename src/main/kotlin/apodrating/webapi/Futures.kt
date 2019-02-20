@@ -1,14 +1,19 @@
 package apodrating.webapi
 
 import io.vertx.core.Future
+import io.vertx.core.json.JsonObject
 import io.vertx.ext.web.api.OperationResponse
 import io.vertx.serviceproxy.ServiceException
 
 /**
- * Create a succeeding Future with a status code
+ * Create a succeeding Future with a status code and an optional json payload
  */
-fun succeed(statusCode: Int): Future<OperationResponse> = Future.succeededFuture(
-    OperationResponse().setStatusCode(statusCode)
+fun succeed(statusCode: Int, jsonObject: JsonObject? = null): Future<OperationResponse> = Future.succeededFuture(
+    with(OperationResponse()) {
+        this.payload = jsonObject?.toBuffer()
+        this.statusCode = statusCode
+        this
+    }
 )
 
 /**

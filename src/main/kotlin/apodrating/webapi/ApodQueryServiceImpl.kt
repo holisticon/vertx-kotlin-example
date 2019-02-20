@@ -9,6 +9,7 @@ import apodrating.model.apodQueryParameters
 import apodrating.model.asApod
 import apodrating.model.asApodRequest
 import apodrating.model.isEmpty
+import apodrating.model.toJsonObject
 import io.reactivex.Maybe
 import io.reactivex.Single
 import io.reactivex.schedulers.Schedulers
@@ -28,6 +29,7 @@ import io.vertx.reactivex.ext.jdbc.JDBCClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import mu.KLogging
 import org.apache.http.HttpStatus
 import java.sql.SQLIntegrityConstraintViolationException
 
@@ -42,6 +44,35 @@ class ApodQueryServiceImpl(
     private val apodConfig: ApodRatingConfiguration = ApodRatingConfiguration(config),
     private val jdbc: JDBCClient = JDBCClient.createShared(vertx, apodConfig.toJdbcConfig())
 ) : ApodQueryService {
+
+    companion object : KLogging()
+
+    /**
+     * Handle a GET request for a single APOD in our database.
+     */
+    override fun getApodForDate(
+        apodId: String,
+        context: OperationRequest,
+        resultHandler: Handler<AsyncResult<OperationResponse>>
+    ) = runBlocking<Unit> {
+        withContext(Dispatchers.IO) {
+            jdbc.rxQuerySingleWithParams("SELECT ID, DATE_STRING FROM APOD WHERE ID=?",
+                json { array(apodId) }
+            )
+        }.flatMap {
+            vertx.eventBus().rxSend<JsonObject>(
+                EVENTBUS_ADDRESS,
+                apodQueryParameters(
+                    it.getInteger(0).toString(),
+                    it.getString(1),
+                    context.headers.get(API_KEY_HEADER)
+                )
+            ).toMaybe()
+        }
+            .map { succeed(HttpStatus.SC_OK, asApod(it.body()).toJsonObject()) }
+            .switchIfEmpty(handleApodNotFound())
+            .subscribe(resultHandler::handle) { handleFailure(resultHandler, it) }
+    }
 
     /**
      * Create a new apod in our database and return the resource's location in a http header.
@@ -123,6 +154,17 @@ class ApodQueryServiceImpl(
         errorCode: Int
     ) {
         resultHandler.handle(fail(errorCode, it.localizedMessage))
+    }
+
+    private fun handleApodNotFound(): Maybe<Future<OperationResponse>>? {
+        return Maybe.just(succeed(HttpStatus.SC_NOT_FOUND))
+    }
+
+    private fun handleFailure(
+        resultHandler: Handler<AsyncResult<OperationResponse>>,
+        it: Throwable
+    ) {
+        resultHandler.handle(fail(HttpStatus.SC_INTERNAL_SERVER_ERROR, it.localizedMessage))
     }
 }
 

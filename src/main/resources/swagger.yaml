@@ -79,9 +79,14 @@ paths:
                 $ref: '#/components/schemas/Error'
 
   /apod/{apodId}:
+    x-vertx-event-bus:
+      address: apod_query_service.apod
+      timeout: 2000
     get:
       summary: get an apod for the specified date
       operationId: getApodForDate
+      x-vertx-event-bus:
+        method: getApodForDate
       security:
         - ApiKeyAuth: []
       tags:
