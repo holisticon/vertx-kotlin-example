@@ -83,5 +83,12 @@ class RatingServiceImpl(
             .subscribe(resultHandler::handle) { handleFailure(resultHandler, it) }
 
     }
+
+    /**
+     * close resources
+     */
+    override fun close() {
+        jdbc.close()
+    }
 }
 

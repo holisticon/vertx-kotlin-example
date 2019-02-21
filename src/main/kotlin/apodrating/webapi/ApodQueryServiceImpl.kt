@@ -71,6 +71,7 @@ class ApodQueryServiceImpl(
         }
             .map { succeed(HttpStatus.SC_OK, asApod(it).toJsonObject()) }
             .switchIfEmpty(handleApodNotFound())
+            .subscribeOn(Schedulers.io())
             .subscribe(resultHandler::handle) { handleFailure(resultHandler, it) }
     }
 
@@ -145,5 +146,11 @@ class ApodQueryServiceImpl(
                     handleFailure(resultHandler, it, HttpStatus.SC_INTERNAL_SERVER_ERROR)
                 }
         }
+    /**
+     * close resources
+     */
+    override fun close() {
+        jdbc.close()
+    }
 }
 

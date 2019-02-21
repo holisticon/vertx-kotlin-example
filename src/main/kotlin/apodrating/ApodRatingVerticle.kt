@@ -26,6 +26,7 @@ import io.vertx.reactivex.ext.web.RoutingContext
 import io.vertx.reactivex.ext.web.api.contract.openapi3.OpenAPI3RouterFactory
 import io.vertx.reactivex.ext.web.handler.StaticHandler
 import io.vertx.serviceproxy.ServiceBinder
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import mu.KLogging
 import org.apache.http.HttpStatus
@@ -67,20 +68,28 @@ class ApodRatingVerticle : CoroutineVerticle() {
                 "INSERT INTO RATING (VALUE, APOD_ID) VALUES 7, 2",
                 "ALTER TABLE APOD ADD CONSTRAINT APOD_UNIQUE UNIQUE(DATE_STRING)"
             )
-            with(ServiceBinder(vertx)) {
-                this.setAddress(RATING_SERVICE_ADDRESS).register(
-                    RatingService::class.java,
-                    RatingServiceImpl(rxVertx, config)
-                )
-                this.setAddress(REMOTE_PROXY_SERVICE_ADDRESS)
-                    .register(RemoteProxyService::class.java, RemoteProxyServiceImpl(rxVertx, config))
-                this.setAddress(APOD_QUERY_ADDRESS).register(
-                    ApodQueryService::class.java,
-                    ApodQueryServiceImpl(rxVertx, config)
-                )
+            val serviceRoutine = async {
+                with(ServiceBinder(vertx)) {
+                    this.setAddress(RATING_SERVICE_ADDRESS).register(
+                        RatingService::class.java,
+                        RatingServiceImpl(rxVertx, config)
+                    )
+                    this.setAddress(REMOTE_PROXY_SERVICE_ADDRESS)
+                        .register(RemoteProxyService::class.java, RemoteProxyServiceImpl(rxVertx, config))
+                    this.setAddress(APOD_QUERY_ADDRESS).register(
+                        ApodQueryService::class.java,
+                        ApodQueryServiceImpl(rxVertx, config)
+                    )
+                }
             }
 
-            client.getConnectionAwait().use { connection -> statements.forEach { connection.executeAwait(it) } }
+            val dbRoutine = async {
+                client.getConnectionAwait().use { connection ->
+                    statements.forEach {
+                        connection.executeAwait(it)
+                    }
+                }
+            }
             val http11Server =
                 OpenAPI3RouterFactory.rxCreate(rxVertx, "swagger.yaml").map {
                     it.mountServicesFromExtensions()
@@ -102,6 +111,11 @@ class ApodRatingVerticle : CoroutineVerticle() {
                         logger.info { "port: ${eachHttpServer.actualPort()}" }
                         eachHttpServer.actualPort()
                     }
+            }.doFinally {
+                launch {
+                    serviceRoutine.await()
+                    dbRoutine.await()
+                }
             }.doOnSuccess { startFuture?.complete() }
                 .subscribeOn(Schedulers.io())
                 .subscribe({ logger.info { "started ${it.size} servers" } })

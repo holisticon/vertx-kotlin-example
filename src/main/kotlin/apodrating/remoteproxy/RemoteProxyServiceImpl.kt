@@ -15,6 +15,7 @@ import apodrating.model.toJsonObject
 import apodrating.webapi.handleFailure
 import io.reactivex.Maybe
 import io.reactivex.Single
+import io.reactivex.schedulers.Schedulers
 import io.vertx.core.AsyncResult
 import io.vertx.core.Future
 import io.vertx.core.Handler
@@ -26,7 +27,7 @@ import io.vertx.reactivex.ext.web.client.WebClient
 import io.vertx.reactivex.ext.web.client.predicate.ResponsePredicate
 import io.vertx.reactivex.ext.web.codec.BodyCodec
 import io.vertx.serviceproxy.ServiceException
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import mu.KLogging
 import org.apache.http.HttpStatus
@@ -36,6 +37,9 @@ import org.ehcache.config.builders.CacheManagerBuilder
 import org.ehcache.config.builders.ResourcePoolsBuilder
 import java.util.concurrent.atomic.AtomicInteger
 
+/**
+ * Service implementation to access the remote NASA apod api.
+ */
 class RemoteProxyServiceImpl(
     vertx: Vertx, val config: JsonObject,
     private val apodConfig: ApodRatingConfiguration = ApodRatingConfiguration(config)
@@ -49,7 +53,7 @@ class RemoteProxyServiceImpl(
 
     init {
         runBlocking {
-            launch {
+            val cacheRoutine = async {
                 CacheManagerBuilder.newCacheManagerBuilder()
                     .withCache(
                         CACHE_ALIAS,
@@ -68,9 +72,9 @@ class RemoteProxyServiceImpl(
                             Apod::class.java
                         )
                     }
-            }.join()
+            }
 
-            launch {
+            val circuitbreakerRoutine = async {
                 circuitBreaker = CircuitBreaker.create(
                     CIRCUIT_BREAKER_NAME, vertx,
                     circuitBreakerOptionsOf(
@@ -81,11 +85,15 @@ class RemoteProxyServiceImpl(
                         maxRetries = 3 // the number of times the circuit breaker tries to redo the operation before failing
                     )
                 )
-            }.join()
+            }
 
-            launch {
+            val webClientRoutine = async {
                 webClient = WebClient.create(vertx)
-            }.join()
+            }
+
+            cacheRoutine.await()
+            circuitbreakerRoutine.await()
+            webClientRoutine.await()
         }
     }
 
@@ -95,7 +103,7 @@ class RemoteProxyServiceImpl(
         nasaApiKey: String,
         resultHandler: Handler<AsyncResult<JsonObject>>
     ): RemoteProxyService {
-        performApodQuery(id, date, nasaApiKey)
+        getFromCacheOrRemoteApi(id, date, nasaApiKey)
             .filter { it.isEmpty().not() }
             .map { Future.succeededFuture(it.toJsonObject()) }
             .switchIfEmpty(
@@ -108,13 +116,14 @@ class RemoteProxyServiceImpl(
                     )
                 )
             )
+            .subscribeOn(Schedulers.io())
             .subscribe(resultHandler::handle) {
                 handleFailure(resultHandler, it, HttpStatus.SC_INTERNAL_SERVER_ERROR)
             }
         return this
     }
 
-    private fun performApodQuery(id: String, date: String, nasaApiKey: String): Single<Apod> = when {
+    private fun getFromCacheOrRemoteApi(id: String, date: String, nasaApiKey: String): Single<Apod> = when {
         apodCache.containsKey(date) -> Single
             .just(apodCache.get(date))
             .doOnSuccess { logger.info { "cache hit: $id" } }
@@ -150,6 +159,12 @@ class RemoteProxyServiceImpl(
             .map { it.body() }
             .map { asApod(apodId, it) }
 
+    /**
+     * close resources
+     */
     override fun close() {
+        webClient.close()
+        circuitBreaker.close()
+        apodCache.clear()
     }
 }
