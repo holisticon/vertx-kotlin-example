@@ -31,6 +31,7 @@
         <codacy-maven-plugin.version>1.1.0</codacy-maven-plugin.version>
         <openapi-generator-maven-plugin.version>3.3.4</openapi-generator-maven-plugin.version>
         <maven-compiler-plugin.version>3.8.0</maven-compiler-plugin.version>
+        <gitflow-maven-plugin.version>1.11.0</gitflow-maven-plugin.version>
     </properties>
 
     <dependencyManagement>
@@ -65,10 +66,6 @@
         </dependency>
         <dependency>
             <groupId>io.vertx</groupId>
-            <artifactId>vertx-web</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.vertx</groupId>
             <artifactId>vertx-service-proxy</artifactId>
         </dependency>
         <dependency>
@@ -85,17 +82,9 @@
         </dependency>
         <dependency>
             <groupId>io.vertx</groupId>
-            <artifactId>vertx-rx-java</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.vertx</groupId>
             <artifactId>vertx-rx-java2</artifactId>
         </dependency>
-        <dependency>
-            <groupId>io.vertx</groupId>
-            <artifactId>vertx-rx-gen</artifactId>
-            <version>${vertx.version}</version>
-        </dependency>
+
         <dependency>
             <groupId>io.vertx</groupId>
             <artifactId>vertx-rx-java2-gen</artifactId>
@@ -155,7 +144,6 @@
             <artifactId>vertx-junit5</artifactId>
             <scope>test</scope>
         </dependency>
-
         <dependency>
             <groupId>org.ehcache</groupId>
             <artifactId>ehcache</artifactId>
@@ -430,7 +418,6 @@
             <plugin>
                 <groupId>com.amashchenko.maven.plugin</groupId>
                 <artifactId>gitflow-maven-plugin</artifactId>
-                <version>1.11.0</version>
                 <configuration>
                     <gitFlowConfig>
                         <productionBranch>master</productionBranch>
@@ -449,6 +436,11 @@
 
         <pluginManagement>
             <plugins>
+                <plugin>
+                    <groupId>com.amashchenko.maven.plugin</groupId>
+                    <artifactId>gitflow-maven-plugin</artifactId>
+                    <version>${gitflow-maven-plugin.version}</version>
+                </plugin>
                 <plugin>
                     <groupId>org.openapitools</groupId>
                     <artifactId>openapi-generator-maven-plugin</artifactId>
