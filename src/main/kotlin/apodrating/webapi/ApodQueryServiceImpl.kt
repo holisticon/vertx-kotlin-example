@@ -123,7 +123,7 @@ class ApodQueryServiceImpl(
                 .filter { it.isEmpty().not() }
                 .map {
                     it.map {
-                        runBlocking {
+                        runBlocking(Dispatchers.IO) {
                             proxyService.rxPerformApodQuery(
                                 it.getInteger("ID").toString(),
                                 it.getString("DATE_STRING"),
@@ -146,6 +146,7 @@ class ApodQueryServiceImpl(
                     handleFailure(resultHandler, it, HttpStatus.SC_INTERNAL_SERVER_ERROR)
                 }
         }
+
     /**
      * close resources
      */

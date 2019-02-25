@@ -9,8 +9,6 @@ import apodrating.webapi.ApodQueryService
 import apodrating.webapi.ApodQueryServiceImpl
 import apodrating.webapi.RatingService
 import apodrating.webapi.RatingServiceImpl
-import io.reactivex.Single
-import io.reactivex.schedulers.Schedulers
 import io.vertx.core.Future
 import io.vertx.core.Handler
 import io.vertx.core.http.HttpServerOptions
@@ -20,12 +18,13 @@ import io.vertx.kotlin.coroutines.CoroutineVerticle
 import io.vertx.kotlin.ext.sql.executeAwait
 import io.vertx.kotlin.ext.sql.getConnectionAwait
 import io.vertx.reactivex.core.Vertx
-import io.vertx.reactivex.core.http.HttpServer
 import io.vertx.reactivex.core.http.HttpServerRequest
 import io.vertx.reactivex.ext.web.RoutingContext
 import io.vertx.reactivex.ext.web.api.contract.openapi3.OpenAPI3RouterFactory
 import io.vertx.reactivex.ext.web.handler.StaticHandler
 import io.vertx.serviceproxy.ServiceBinder
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import mu.KLogging
@@ -51,7 +50,9 @@ class ApodRatingVerticle : CoroutineVerticle() {
     override fun start(startFuture: Future<Void>?) {
         launch {
             val apodConfig = ApodRatingConfiguration(config)
-            client = JDBCClient.createShared(vertx, apodConfig.toJdbcConfig())
+            val jdbcRoutine = async {
+                client = JDBCClient.createShared(vertx, apodConfig.toJdbcConfig())
+            }
             apiKey = apodConfig.nasaApiKey
             rxVertx = Vertx(vertx)
             val statements = listOf(
@@ -83,43 +84,63 @@ class ApodRatingVerticle : CoroutineVerticle() {
                 }
             }
 
-            val dbRoutine = async {
+            val dbRoutine = async(Dispatchers.IO) {
+                jdbcRoutine.await()
                 client.getConnectionAwait().use { connection ->
                     statements.forEach {
                         connection.executeAwait(it)
                     }
                 }
             }
-            val http11Server =
-                OpenAPI3RouterFactory.rxCreate(rxVertx, "swagger.yaml").map {
-                    it.mountServicesFromExtensions()
-                    rxVertx.createHttpServer()
-                        .requestHandler(createRouter(it))
-                        .listen(apodConfig.port)
-                }
-            val http2Server =
-                OpenAPI3RouterFactory.rxCreate(rxVertx, "swagger.yaml").map {
-                    it.mountServicesFromExtensions()
-                    rxVertx.createHttpServer(http2ServerOptions())
-                        .requestHandler(createRouter(it))
-                        .listen(apodConfig.h2Port)
-                }
-            Single.zip(listOf(http11Server, http2Server)) {
-                it
-                    .filterIsInstance<HttpServer>()
-                    .map { eachHttpServer ->
-                        logger.info { "port: ${eachHttpServer.actualPort()}" }
-                        eachHttpServer.actualPort()
+
+            val http11ServerRoutine = async(
+                Dispatchers.IO, block = startHttpServer(
+                    apodConfig.port, startFuture
+                )
+            )
+            val http2ServerRoutine = async(
+                Dispatchers.IO,
+                block = startHttpServer(
+                    apodConfig.h2Port,
+                    startFuture,
+                    HttpServerOptions()
+                        .setKeyCertOptions(
+                            pemKeyCertOptionsOf(certPath = "tls/server-cert.pem", keyPath = "tls/server-key.pem")
+                        )
+                        .setSsl(true)
+                        .setUseAlpn(true)
+                )
+            )
+
+            serviceRoutine.await()
+            dbRoutine.await()
+            http11ServerRoutine.await()
+            http2ServerRoutine.await()
+            logger.info { "started 2 servers" }
+            startFuture?.complete()
+        }
+    }
+
+    private fun startHttpServer(
+        port: Int,
+        startFuture: Future<Void>?,
+        httpServerOptions: HttpServerOptions? = null
+    ): suspend CoroutineScope.() -> Unit {
+        return {
+            OpenAPI3RouterFactory.create(rxVertx, "swagger.yaml") {
+                when (it.succeeded()) {
+                    true -> with(it.result()) {
+                        this.mountServicesFromExtensions()
+                        when {
+                            httpServerOptions != null -> rxVertx.createHttpServer(httpServerOptions)
+                            else -> rxVertx.createHttpServer()
+                        }
+                            .requestHandler(createRouter(this))
+                            .listen(port)
                     }
-            }.doFinally {
-                launch {
-                    serviceRoutine.await()
-                    dbRoutine.await()
+                    else -> startFuture?.fail("could not start http2 server.")
                 }
-            }.doOnSuccess { startFuture?.complete() }
-                .subscribeOn(Schedulers.io())
-                .subscribe({ logger.info { "started ${it.size} servers" } })
-                { logger.error { it } }
+            }
         }
     }
 
@@ -148,11 +169,4 @@ class ApodRatingVerticle : CoroutineVerticle() {
                 ).toJsonString()
             )
         }
-
-    private fun http2ServerOptions(): HttpServerOptions = HttpServerOptions()
-        .setKeyCertOptions(
-            pemKeyCertOptionsOf(certPath = "tls/server-cert.pem", keyPath = "tls/server-key.pem")
-        )
-        .setSsl(true)
-        .setUseAlpn(true)
 }
