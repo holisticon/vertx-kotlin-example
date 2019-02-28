@@ -1,0 +1,103 @@
+openapi: '3.0.0'
+info:
+  version: 1.1.0
+  title: apodrating
+  description: "The apod rating app lets you rate NASA's Astronomy Picture of the Day and view ratings for them."
+servers:
+  - url: http://localhost:8091
+paths:
+  /planetary/apod:
+    get:
+      summary: get mock data
+      operationId: getMockData
+      tags:
+        - apodratingtest
+      parameters:
+        - name: date
+          in: query
+          required: true
+          description: the id of the picture
+          schema:
+            type: string
+            pattern: '^([12]\d{3}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01]))$'
+        - name: hd
+          in: query
+          required: true
+          description: hd picture
+          schema:
+            type: string
+        - name: api_key
+          in: query
+          required: true
+          description: nasa pai key
+          schema:
+            type: string
+      responses:
+        '200':
+          description: An array of apods or an empty array, if no data is available.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MockApod'
+        '500':
+          description: the request could not be completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    MockApod:
+      description: the apod data object
+      required:
+        - id
+        - title
+        - imageUriHd
+      properties:
+        date:
+          description: The date string of this apod
+          type: string
+          pattern: '^([12]\d{3}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01]))$'
+          readOnly: true
+        explanation:
+          description: an explanations
+          readOnly: true
+          type: string
+        media_type:
+          description: the media type
+          readOnly: true
+          type: string
+        service_version:
+          description: the service version number
+          readOnly: true
+          type: string
+        title:
+          description: the title of the image
+          readOnly: true
+          type: string
+        url:
+          description: the url of the image
+          readOnly: true
+          type: string
+        hdurl:
+          description: the hd url of the image
+          readOnly: true
+          type: string
+    Error:
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: integer
+          format: int32
+        message:
+          type: string
