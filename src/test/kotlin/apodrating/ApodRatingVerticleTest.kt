@@ -3,7 +3,6 @@ package apodrating
 import apodrating.mock.MockServiceVerticle
 import apodrating.model.ApodRatingConfiguration
 import apodrating.model.ApodRequest
-import apodrating.model.Rating
 import apodrating.model.RatingRequest
 import apodrating.model.asApod
 import apodrating.model.asRating
@@ -48,6 +47,8 @@ class ApodRatingVerticleTest {
 
     private lateinit var testConfig: ApodRatingConfiguration
 
+    private lateinit var webClient: WebClient
+
     /**
      * Prepare test by deploying the verticle.
      */
@@ -81,9 +82,9 @@ class ApodRatingVerticleTest {
                         )
                     )
                 ) { it.filterIsInstance<String>() }
-                    .doAfterSuccess {
-                        testConfig = ApodRatingConfiguration(config)
-                    }
+                    .doAfterSuccess { testConfig = ApodRatingConfiguration(config) }
+                    .doAfterSuccess { webClient = WebClient.create(vertx) }
+                    .subscribeOn(Schedulers.io())
                     .subscribe({
                         testContext.completeNow()
                     }) { error -> logger.error { error } }
@@ -94,119 +95,94 @@ class ApodRatingVerticleTest {
     /**
      * Perform test.
      */
-    @DisplayName("GET apod/0")
+    @DisplayName("rx GET apod/0")
     @Test
     @Order(1)
-    fun getApod(vertx: Vertx, testContext: VertxTestContext) {
-        logger.info { "GET apod" }
-        WebClient.create(vertx).get(testConfig.port, LOCALHOST, "/apod/0")
+    fun rxGetApod(vertx: Vertx, testContext: VertxTestContext) {
+        logger.info { "rx GET apod" }
+        webClient.get(testConfig.port, LOCALHOST, "/apod/0")
             .putHeader(API_KEY_HEADER, testConfig.nasaApiKey)
             .`as`(BodyCodec.jsonObject())
-            .send { ar ->
-                when {
-                    ar.succeeded() -> {
-                        VertxMatcherAssert.assertThat(testContext, asApod(ar.result().body()).id, Matchers.`is`("0"))
-                        testContext.completeNow()
-                    }
-                    else -> testContext.failNow(ar.cause())
-                }
-            }
+            .rxSend()
+            .map { it.body() }
+            .map { asApod(it).id }
+            .map { VertxMatcherAssert.assertThat(testContext, it, Matchers.`is`("0")) }
+            .doOnSuccess { logger.info { "rxGetApod/o succeeded" } }
+            .subscribe({ testContext.completeNow() }) { testContext.failNow(it) }
     }
 
     /**
      * Perform test.
      */
-    @DisplayName("GET apod")
+    @DisplayName("rx GET apod")
     @Test
     @Repeat(2)
     @Order(2)
     fun getApods(vertx: Vertx, testContext: VertxTestContext) {
-        logger.info { "GET apods" }
-        WebClient.create(vertx).get(testConfig.port, LOCALHOST, "/apod")
+        logger.info { "rx GET apods" }
+        webClient.get(testConfig.port, LOCALHOST, "/apod")
             .putHeader(API_KEY_HEADER, testConfig.nasaApiKey)
             .`as`(BodyCodec.jsonArray())
-            .send { ar ->
-                when {
-                    ar.succeeded() -> logger.info {
-                        val result = ar.result().body()
-                        VertxMatcherAssert.assertThat(testContext, result.size(), Matchers.`is`(4))
-                        testContext.completeNow()
-                    }
-                    else -> testContext.failNow(ar.cause())
-                }
-            }
+            .rxSend()
+            .map { it.body() }
+            .map { VertxMatcherAssert.assertThat(testContext, it.size(), Matchers.`is`(4)) }
+            .doOnSuccess { logger.info { "rxGetApod succeeded" } }
+            .subscribe({ testContext.completeNow() }) { testContext.failNow(it) }
     }
 
     /**
      * Perform test.
      */
-    @DisplayName("POST apod")
+    @DisplayName("rx POST apod")
     @Test
     @Order(3)
     fun postApod(vertx: Vertx, testContext: VertxTestContext) {
-        logger.info { "POST apod" }
-        WebClient.create(vertx).post(testConfig.port, LOCALHOST, "/apod")
+        logger.info { "rx POST apod" }
+        webClient
+            .post(testConfig.port, LOCALHOST, "/apod")
             .putHeader(API_KEY_HEADER, testConfig.nasaApiKey)
-            .sendJsonObject(JsonObject.mapFrom(ApodRequest("2018-02-02"))) { ar ->
-                when {
-                    ar.succeeded() -> {
-                        VertxMatcherAssert.assertThat(
-                            testContext,
-                            ar.result().statusCode(),
-                            Matchers.`is`(HttpStatus.SC_CREATED)
-                        )
-                        testContext.completeNow()
-                    }
-                    else -> testContext.failNow(ar.cause())
-                }
-            }
+            .rxSendJson(JsonObject.mapFrom(ApodRequest("2018-02-02")))
+            .map { it.statusCode() }
+            .map { VertxMatcherAssert.assertThat(testContext, it, Matchers.`is`(HttpStatus.SC_CREATED)) }
+            .doOnSuccess { logger.info { "rxPostApod succeeded" } }
+            .subscribe({ testContext.completeNow() }) { testContext.failNow(it) }
     }
 
     /**
      * Perform test.
      */
-    @DisplayName("PUT rating")
+    @DisplayName("rx PUT rating")
     @Test
     @Order(5)
     fun putRating(vertx: Vertx, testContext: VertxTestContext) {
-        logger.info { "PUT rating" }
-        WebClient.create(vertx).put(testConfig.port, LOCALHOST, "/apod/0/rating")
+        logger.info { "rx PUT rating" }
+        webClient
+            .put(testConfig.port, LOCALHOST, "/apod/0/rating")
             .putHeader(API_KEY_HEADER, testConfig.nasaApiKey)
-            .sendJsonObject(JsonObject.mapFrom(RatingRequest(7))) { ar ->
-                when {
-                    ar.succeeded() -> {
-                        VertxMatcherAssert.assertThat(
-                            testContext,
-                            ar.result().statusCode(),
-                            Matchers.`is`(HttpStatus.SC_NO_CONTENT)
-                        )
-                        testContext.completeNow()
-                    }
-                    else -> testContext.failNow(ar.cause())
-                }
-            }
+            .rxSendJsonObject(JsonObject.mapFrom(RatingRequest(7)))
+            .map { it.statusCode() }
+            .map { VertxMatcherAssert.assertThat(testContext, it, Matchers.`is`(HttpStatus.SC_NO_CONTENT)) }
+            .doOnSuccess { logger.info { "rxPUTrating succeeded" } }
+            .subscribe({ testContext.completeNow() }) { testContext.failNow(it) }
     }
 
     /**
      * Perform test.
      */
-    @DisplayName("GET apod/0/rating")
+    @DisplayName("rx GET apod/0/rating")
     @Test
     @Order(4)
     fun getApodRating(vertx: Vertx, testContext: VertxTestContext) {
-        logger.info { "GET rating" }
-        WebClient.create(vertx).get(testConfig.port, LOCALHOST, "/apod/0/rating")
+        logger.info { "rx GET rating" }
+        webClient
+            .get(testConfig.port, LOCALHOST, "/apod/0/rating")
             .`as`(BodyCodec.jsonObject())
-            .send { ar ->
-                when {
-                    ar.succeeded() -> {
-                        val rating: Rating = asRating(ar.result().body())
-                        VertxMatcherAssert.assertThat(testContext, rating.id, Matchers.`is`(0))
-                        testContext.completeNow()
-                    }
-                    else -> testContext.failNow(ar.cause())
-                }
-            }
+            .rxSend()
+            .map { it.body() }
+            .map { asRating(it).id }
+            .map { VertxMatcherAssert.assertThat(testContext, it, Matchers.`is`(0)) }
+            .doOnSuccess { logger.info { "rxGETrating succeeded" } }
+            .subscribe({ testContext.completeNow() }) { testContext.failNow(it) }
     }
 
     /**
@@ -222,20 +198,13 @@ class ApodRatingVerticleTest {
                 logger.info { "undeploying $it" }
                 it
             }
-            .map {
-                vertx.rxUndeploy(it)
-            }.sequential()
+            .map { vertx.rxUndeploy(it) }
+            .sequential()
             .toList()
-            .doAfterSuccess {
-                testContext.completeNow()
-            }
-            .subscribe({
-                logger.info { "undeployed ${it.size} verticles" }
-
-            },
-                {
-                    testContext.failNow(it)
-                })
+            .doOnSuccess { webClient.close() }
+            .doAfterSuccess { testContext.completeNow() }
+            .subscribeOn(Schedulers.computation())
+            .subscribe({ logger.info { "undeployed ${it.size} verticles" } }, { testContext.failNow(it) })
     }
 }
 

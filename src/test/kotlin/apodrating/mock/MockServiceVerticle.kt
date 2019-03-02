@@ -24,34 +24,28 @@ class MockServiceVerticle : CoroutineVerticle() {
     override fun start(startFuture: Future<Void>?) {
         launch {
             rxVertx = Vertx(vertx)
-
             withContext(
-                Dispatchers.IO, block = startHttpServer(
-                    8091, startFuture
-                )
+                Dispatchers.IO, rxStartHttpServer(8091, startFuture)
             )
         }
         startFuture?.complete()
     }
 
-    private fun startHttpServer(
+    private fun rxStartHttpServer(
         port: Int,
         startFuture: Future<Void>?
-    ): suspend CoroutineScope.() -> Unit {
-        return {
-            OpenAPI3RouterFactory.create(rxVertx, "mock-api.yaml") {
-                when (it.succeeded()) {
-                    true -> with(it.result()) {
-                        coroutineHandler(operationId = "getMockData") { handlePutApodRating(it) }
-                        //coroutineSecurityHandler("ApiKeyAuth") { handleApiKeyValidation(it, "") }
-                        rxVertx.createHttpServer()
-                            .requestHandler(this.router)
-                            .listen(port)
-                    }
-                    else -> startFuture?.fail("could not start http2 server.")
-                }
+    ): suspend CoroutineScope.() -> Unit = {
+        OpenAPI3RouterFactory.rxCreate(rxVertx, "mock-api.yaml")
+            .map {
+                it.coroutineHandler(operationId = "getMockData") { handlePutApodRating(it) }
+            }.map {
+                rxVertx.createHttpServer()
+                    .requestHandler(it.router)
+                    .listen(port)
             }
-        }
+            .subscribe({ logger.info { "#### started mockserver on port ${it.actualPort()}" } })
+            { startFuture?.fail("could not start http2 server.") }
+
     }
 
     private fun handlePutApodRating(ctx: RoutingContext) {
@@ -75,18 +69,6 @@ class MockServiceVerticle : CoroutineVerticle() {
         operationId: String,
         function: suspend (RoutingContext) -> Unit
     ) =
-        addHandlerByOperationId(operationId) {
-            launch { function(it) }
-        }
-
-    private fun OpenAPI3RouterFactory.coroutineSecurityHandler(
-        securitySchemaName: String,
-        function: suspend (RoutingContext) -> Unit
-    ) =
-        addSecurityHandler(securitySchemaName) {
-            launch { function(it) }
-        }
-
-    private fun handleApiKeyValidation(ctx: RoutingContext, apiKey: String) = ctx.next()
+        addHandlerByOperationId(operationId) { launch { function(it) } }
 }
 
