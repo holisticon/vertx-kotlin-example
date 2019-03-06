@@ -116,7 +116,6 @@ class ApodRatingVerticle : CoroutineVerticle() {
             dbRoutine.await()
             http11ServerRoutine.await()
             http2ServerRoutine.await()
-            logger.info { "started 2 servers" }
             startFuture?.complete()
         }
     }
@@ -125,23 +124,19 @@ class ApodRatingVerticle : CoroutineVerticle() {
         port: Int,
         startFuture: Future<Void>?,
         httpServerOptions: HttpServerOptions? = null
-    ): suspend CoroutineScope.() -> Unit {
-        return {
-            OpenAPI3RouterFactory.create(rxVertx, "swagger.yaml") {
-                when (it.succeeded()) {
-                    true -> with(it.result()) {
-                        this.mountServicesFromExtensions()
-                        when {
-                            httpServerOptions != null -> rxVertx.createHttpServer(httpServerOptions)
-                            else -> rxVertx.createHttpServer()
-                        }
-                            .requestHandler(createRouter(this))
-                            .listen(port)
-                    }
-                    else -> startFuture?.fail("could not start http2 server.")
-                }
+    ): suspend CoroutineScope.() -> Unit = {
+        OpenAPI3RouterFactory.rxCreate(rxVertx, "swagger.yaml")
+            .map { it.mountServicesFromExtensions() }
+            .map {
+                when (httpServerOptions != null) {
+                    true -> rxVertx.createHttpServer(httpServerOptions)
+                    else -> rxVertx.createHttpServer()
+                }.requestHandler(createRouter(it))
             }
-        }
+            .flatMap { it.rxListen(port) }
+            .subscribe({ logger.info { "server listens on port ${it.actualPort()}" } }) {
+                startFuture?.fail("could not start http2 server.")
+            }
     }
 
     private fun createRouter(routerFactory: OpenAPI3RouterFactory): Handler<HttpServerRequest> =

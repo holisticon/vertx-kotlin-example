@@ -69,7 +69,7 @@ class ApodRatingVerticleTest {
             )
             .configStream()
             .handler { config ->
-                Single.zip<String, List<String>>(
+                Single.just(
                     listOf(
                         vertx.rxDeployVerticle(MockServiceVerticle()),
                         vertx.rxDeployVerticle(
@@ -77,14 +77,19 @@ class ApodRatingVerticleTest {
                             DeploymentOptions(JsonObject().put("config", config))
                         )
                     )
-                ) { it.filterIsInstance<String>() }
+                )
+                    .flattenAsFlowable { it }
+                    .parallel()
+                    .runOn(Schedulers.computation())
+                    .flatMap { it.toFlowable() }
+                    .sequential()
+                    .toList()
                     .doAfterSuccess { testConfig = ApodRatingConfiguration(config) }
                     .doAfterSuccess { webClient = WebClient.create(vertx) }
-                    .subscribeOn(Schedulers.io())
+                    .subscribeOn(Schedulers.computation())
                     .subscribe({
                         testContext.completeNow()
                     }) { error -> logger.error { error } }
-
             }
     }
 
@@ -194,6 +199,7 @@ class ApodRatingVerticleTest {
                 logger.info { "undeploying $it" }
                 it
             }
+
             .map { vertx.rxUndeploy(it) }
             .sequential()
             .toList()

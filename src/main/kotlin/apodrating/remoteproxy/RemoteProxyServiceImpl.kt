@@ -133,6 +133,7 @@ class RemoteProxyServiceImpl(
                 if (this.getAndIncrement() > 0)
                     logger.info { "number of retries: ${this.get() - 1}" }
                 rxSendGet(date, nasaApiKey, id)
+                    .subscribeOn(Schedulers.io())
                     .doOnSuccess {
                         if (!apodCache.containsKey(date)) {
                             apodCache.put(date, it)

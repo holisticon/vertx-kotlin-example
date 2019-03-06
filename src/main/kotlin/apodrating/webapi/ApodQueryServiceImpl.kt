@@ -3,7 +3,6 @@ package apodrating.webapi
 import apodrating.API_KEY_HEADER
 import apodrating.LOCATION_HEADER
 import apodrating.REMOTE_PROXY_SERVICE_ADDRESS
-import apodrating.model.Apod
 import apodrating.model.ApodRatingConfiguration
 import apodrating.model.asApod
 import apodrating.model.asApodRequest
@@ -12,7 +11,6 @@ import apodrating.model.toJsonObject
 import apodrating.remoteproxy.createRemoteProxyServiceProxy
 import apodrating.remoteproxy.reactivex.RemoteProxyService
 import io.reactivex.Maybe
-import io.reactivex.Single
 import io.reactivex.schedulers.Schedulers
 import io.vertx.core.AsyncResult
 import io.vertx.core.Future
@@ -62,14 +60,14 @@ class ApodQueryServiceImpl(
             jdbc.rxQuerySingleWithParams("SELECT ID, DATE_STRING FROM APOD WHERE ID=?",
                 json { array(apodId) }
             )
-        }.flatMap {
-            proxyService.rxPerformApodQuery(
-                it.getInteger(0).toString(),
-                it.getString(1),
-                context.headers.get(API_KEY_HEADER)
-            ).toMaybe()
         }
-            .map { succeed(HttpStatus.SC_OK, asApod(it).toJsonObject()) }
+            .flatMap {
+                proxyService.rxPerformApodQuery(
+                    it.getInteger(0).toString(),
+                    it.getString(1),
+                    context.headers.get(API_KEY_HEADER)
+                ).subscribeOn(Schedulers.io()).toMaybe()
+            }.map { succeed(HttpStatus.SC_OK, asApod(it).toJsonObject()) }
             .switchIfEmpty(handleApodNotFound())
             .subscribeOn(Schedulers.io())
             .subscribe(resultHandler::handle) { handleFailure(resultHandler, it) }
@@ -88,18 +86,17 @@ class ApodQueryServiceImpl(
         withContext(Dispatchers.IO) {
             jdbc.rxUpdateWithParams("INSERT INTO APOD (DATE_STRING) VALUES ?",
                 json { array(apodRequest.dateString) })
-        }.map { it.keys.get<Int>(0) }
+        }
+            .map { it.keys.get<Int>(0) }
             .flatMap {
                 proxyService.rxPerformApodQuery(
                     it.toString(),
                     apodRequest.dateString,
                     apiKeyHeader
-                )
+                ).subscribeOn(Schedulers.io())
             }
             .map { asApod(it) }
-            .map {
-                succeed(HttpStatus.SC_CREATED, LOCATION_HEADER, "/apod/${it.id}")
-            }
+            .map { succeed(HttpStatus.SC_CREATED, LOCATION_HEADER, "/apod/${it.id}") }
             .onErrorReturn {
                 when (it) {
                     is SQLIntegrityConstraintViolationException -> succeed(HttpStatus.SC_CONFLICT)
@@ -118,27 +115,27 @@ class ApodQueryServiceImpl(
      */
     override fun getApods(context: OperationRequest, resultHandler: Handler<AsyncResult<OperationResponse>>) =
         runBlocking<Unit> {
-            withContext(Dispatchers.IO) { jdbc.rxQuery("SELECT ID, DATE_STRING FROM APOD ") }
+            withContext(Dispatchers.IO) {
+                jdbc.rxQuery("SELECT ID, DATE_STRING FROM APOD ")
+            }
+                .observeOn(Schedulers.computation())
                 .map { it.rows.toList() }
                 .filter { it.isEmpty().not() }
-                .map {
-                    it.map {
-                        runBlocking(Dispatchers.IO) {
-                            proxyService.rxPerformApodQuery(
-                                it.getInteger("ID").toString(),
-                                it.getString("DATE_STRING"),
-                                context.headers.get(API_KEY_HEADER)
-                            ).map { msg -> asApod(msg) }
-                        }
-                    }.toList()
-                }
+                .flattenAsFlowable { it }
+                .parallel()
+                .runOn(Schedulers.io())
                 .flatMap {
-                    Single.zip<Apod, List<Apod>>(it) { apodArray ->
-                        apodArray
-                            .filterIsInstance<Apod>()
-                            .filter { apod -> !apod.isEmpty() }
-                    }.toMaybe()
+                    proxyService.rxPerformApodQuery(
+                        it.getInteger("ID").toString(),
+                        it.getString("DATE_STRING"),
+                        context.headers.get(API_KEY_HEADER)
+                    ).toFlowable()
                 }
+                .map { asApod(it) }
+                .filter { !it.isEmpty() }
+                .sequential()
+                .toList()
+                .toMaybe()
                 .map { Future.succeededFuture(OperationResponse.completedWithJson(Json.array(it))) }
                 .switchIfEmpty(Maybe.just(Future.succeededFuture(OperationResponse.completedWithJson(JsonArray()))))
                 .subscribeOn(Schedulers.io())
