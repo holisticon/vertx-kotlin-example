@@ -43,7 +43,7 @@ class MockServiceVerticle : CoroutineVerticle() {
                     .requestHandler(it.router)
                     .listen(port)
             }
-            .subscribe({ logger.info { "#### started mockserver on port ${it.actualPort()}" } })
+            .subscribe({ logger.info { "started mockserver on port ${it.actualPort()}" } })
             { startFuture?.fail("could not start http2 server.") }
 
     }
