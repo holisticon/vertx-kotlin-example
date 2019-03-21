@@ -21,8 +21,8 @@
         <vertx.version>3.6.3</vertx.version>
         <slf4j-simple.version>1.7.26</slf4j-simple.version>
         <hsqldb.version>2.4.1</hsqldb.version>
-        <junit-jupiter.version>5.4.0</junit-jupiter.version>
-        <junit-platform.version>1.4.0</junit-platform.version>
+        <junit-jupiter.version>5.4.1</junit-jupiter.version>
+        <junit-platform.version>1.4.1</junit-platform.version>
         <ehcache.version>3.7.0</ehcache.version>
         <hamcrest.version>2.1</hamcrest.version>
 
