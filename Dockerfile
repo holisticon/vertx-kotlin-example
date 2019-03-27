@@ -18,9 +18,9 @@ ENV NASA_API_PATH=${NASA_API_PATH_ARG}
 ARG NASA_API_KEY_ARG
 ENV NASA_API_KEY=${NASA_API_KEY_ARG}
 COPY target/dependency-jars /run/dependency-jars
-ADD target/application.jar /run/application.jar
+COPY target/application.jar /run/application.jar
 
-EXPOSE $APODRATING_PORT_ARG:$APODRATING_PORT_ARG
-EXPOSE $APODRATING_H2_PORT_ARG:$APODRATING_H2_PORT_ARG
+EXPOSE $APODRATING_PORT_ARG
+EXPOSE $APODRATING_H2_PORT_ARG
 
-ENTRYPOINT java -jar run/application.jar -D exec.mainClass="apodrating.MainKt"
+ENTRYPOINT ["java", "-jar", "run/application.jar", "-D", "exec.mainClass=\"apodrating.MainKt\""]
