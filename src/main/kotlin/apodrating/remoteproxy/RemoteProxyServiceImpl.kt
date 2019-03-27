@@ -124,11 +124,9 @@ class RemoteProxyServiceImpl(
         return this
     }
 
-    private fun getFromCacheOrRemoteApi(id: String, date: String, nasaApiKey: String): Single<Apod> = when {
-        apodCache.containsKey(date) -> Single
-            .just(apodCache.get(date))
-            .doOnSuccess { logger.info { "cache hit: $id" } }
-        else -> with(AtomicInteger()) {
+    private fun getFromCacheOrRemoteApi(id: String, date: String, nasaApiKey: String): Single<Apod> {
+        apodCache.get(date)?.let { return Single.just(it) }
+        return with(AtomicInteger()) {
             circuitBreaker.rxExecuteCommandWithFallback<Apod>({ future ->
                 if (this.getAndIncrement() > 0)
                     logger.info { "number of retries: ${this.get() - 1}" }
@@ -145,7 +143,6 @@ class RemoteProxyServiceImpl(
                 emptyApod()
             }
         }
-
     }
 
     private fun rxSendGet(date: String, nasaApiKey: String, apodId: String): Single<Apod> =

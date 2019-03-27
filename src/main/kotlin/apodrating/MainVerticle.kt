@@ -16,6 +16,10 @@ class MainVerticle : AbstractVerticle() {
      * Start the MainVerticle and our two application verticles.
      */
     override fun start() {
+        val players = listOf("1", "2", "3")
+        val map = players.map {
+            if (it == "3") "4" else  it
+        }
         with(System.currentTimeMillis()) {
             vertx.rxDeployVerticle(verticleName, deploymentOptionsFromEnv(vertx))
                 .subscribe({ logger.info { "Startup time ${System.currentTimeMillis() - this}ms" } })

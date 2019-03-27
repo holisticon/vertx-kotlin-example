@@ -135,10 +135,8 @@ class ApodRatingVerticle : CoroutineVerticle() {
         OpenAPI3RouterFactory.rxCreate(rxVertx, "swagger.yaml")
             .map { it.mountServicesFromExtensions() }
             .map {
-                when (httpServerOptions != null) {
-                    true -> rxVertx.createHttpServer(httpServerOptions)
-                    else -> rxVertx.createHttpServer()
-                }.requestHandler(createRouter(it))
+                (httpServerOptions?.let { rxVertx.createHttpServer(it) }
+                    ?: rxVertx.createHttpServer()).requestHandler(createRouter(it))
             }
             .flatMap { it.rxListen(port) }
             .subscribe({ logger.info { "server listens on port ${it.actualPort()}" } }) {

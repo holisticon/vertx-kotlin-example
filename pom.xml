@@ -26,13 +26,15 @@
         <ehcache.version>3.7.0</ehcache.version>
         <hamcrest.version>2.1</hamcrest.version>
 
-        <maven-shade-plugin.version>3.2.1</maven-shade-plugin.version>
         <maven-surefire-plugin.version>2.22.1</maven-surefire-plugin.version>
         <jacoco-maven-plugin.version>0.8.2</jacoco-maven-plugin.version>
         <codacy-maven-plugin.version>1.1.0</codacy-maven-plugin.version>
         <openapi-generator-maven-plugin.version>3.3.4</openapi-generator-maven-plugin.version>
         <maven-compiler-plugin.version>3.8.0</maven-compiler-plugin.version>
         <gitflow-maven-plugin.version>1.11.0</gitflow-maven-plugin.version>
+        <dockerfile-maven.version>1.4.10</dockerfile-maven.version>
+        <maven-jar-plugin.version>3.1.1</maven-jar-plugin.version>
+        <maven-dependency-plugin.version>3.1.1</maven-dependency-plugin.version>
     </properties>
 
     <dependencyManagement>
@@ -188,6 +190,42 @@
                 </plugins>
             </build>
         </profile>
+        <profile>
+            <id>docker</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>com.spotify</groupId>
+                        <artifactId>dockerfile-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>default</id>
+                                <goals>
+                                    <goal>build</goal>
+                                    <goal>push</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                        <configuration>
+                            <repository>weinschenker/kotlin-example-coroutines</repository>
+                            <tag>${project.version}</tag>
+                            <buildArgs>
+                                <!--<JAR_FILE>application.jar</JAR_FILE>-->
+                                <JAR_FILE>${project.build.finalName}.jar</JAR_FILE>
+                                <APODRATING_PORT_ARG>${env.APODRATING_PORT}</APODRATING_PORT_ARG>
+                                <APODRATING_H2_PORT_ARG>${env.APODRATING_H2_PORT}</APODRATING_H2_PORT_ARG>
+                                <JDBC_URL_ARG>${env.JDBC_URL}</JDBC_URL_ARG>
+                                <JDBC_DRIVER_ARG>${env.JDBC_DRIVER}</JDBC_DRIVER_ARG>
+                                <JDBC_MAX_POOL_SIZE_ARG>${env.JDBC_MAX_POOL_SIZE}</JDBC_MAX_POOL_SIZE_ARG>
+                                <NASA_API_KEY_ARG>${env.NASA_API_KEY}</NASA_API_KEY_ARG>
+                                <NASA_API_HOST_ARG>${env.NASA_API_HOST}</NASA_API_HOST_ARG>
+                                <NASA_API_PATH_ARG>${env.NASA_API_PATH}</NASA_API_PATH_ARG>
+                            </buildArgs>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
     </profiles>
     <build>
         <defaultGoal>clean compile</defaultGoal>
@@ -303,38 +341,6 @@
                     </execution>
                 </executions>
             </plugin>
-
-
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-shade-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>shade</goal>
-                        </goals>
-                        <configuration>
-                            <finalName>application</finalName>
-                            <createDependencyReducedPom>false</createDependencyReducedPom>
-                            <minimizeJar>false</minimizeJar>
-                            <transformers>
-                                <transformer
-                                        implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                    <manifestEntries>
-                                        <Main-Class>apodrating.MainKt</Main-Class>
-                                        <Main-Verticle>apodrating.AppKt</Main-Verticle>
-                                    </manifestEntries>
-                                </transformer>
-                                <transformer
-                                        implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
-                                    <resource>META-INF/services/io.vertx.core.spi.VerticleFactory</resource>
-                                </transformer>
-                            </transformers>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
             <plugin>
                 <groupId>org.openapitools</groupId>
                 <artifactId>openapi-generator-maven-plugin</artifactId>
@@ -383,6 +389,38 @@
                             <generateApis>false</generateApis>
                             <generateSupportingFiles>false</generateSupportingFiles>
                             <configHelp>false</configHelp>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <configuration>
+                    <finalName>application</finalName>
+                    <archive>
+                        <manifest>
+                            <addClasspath>true</addClasspath>
+                            <mainClass>apodrating.MainKt</mainClass>
+                            <classpathPrefix>dependency-jars/</classpathPrefix>
+                        </manifest>
+                    </archive>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>copy-dependencies</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>copy-dependencies</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>
+                                ${project.build.directory}/dependency-jars/
+                            </outputDirectory>
                         </configuration>
                     </execution>
                 </executions>
@@ -478,6 +516,7 @@
 
                 </configuration>
             </plugin>
+
         </plugins>
 
         <pluginManagement>
@@ -499,13 +538,18 @@
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
-                    <artifactId>maven-shade-plugin</artifactId>
-                    <version>${maven-shade-plugin.version}</version>
+                    <artifactId>maven-jar-plugin</artifactId>
+                    <version>${maven-jar-plugin.version}</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-surefire-plugin</artifactId>
                     <version>${maven-surefire-plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-dependency-plugin</artifactId>
+                    <version>${maven-dependency-plugin.version}</version>
                 </plugin>
                 <plugin>
                     <groupId>org.jacoco</groupId>
@@ -524,6 +568,11 @@
                     <configuration>
                         <coverageReportFile>target/site/jacoco/jacoco.xml</coverageReportFile>
                     </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>com.spotify</groupId>
+                    <artifactId>dockerfile-maven-plugin</artifactId>
+                    <version>${dockerfile-maven.version}</version>
                 </plugin>
             </plugins>
         </pluginManagement>
