@@ -23,7 +23,7 @@
         <hsqldb.version>2.4.1</hsqldb.version>
         <junit-jupiter.version>5.4.1</junit-jupiter.version>
         <junit-platform.version>1.4.1</junit-platform.version>
-        <ehcache.version>3.7.0</ehcache.version>
+        <ehcache.version>3.7.1</ehcache.version>
         <hamcrest.version>2.1</hamcrest.version>
 
         <maven-surefire-plugin.version>2.22.1</maven-surefire-plugin.version>
