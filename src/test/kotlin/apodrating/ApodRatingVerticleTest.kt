@@ -125,7 +125,7 @@ class ApodRatingVerticleTest {
             .`as`(BodyCodec.jsonArray())
             .rxSend()
             .map { it.body() }
-            .map { VertxMatcherAssert.assertThat(testContext, it.size(), Matchers.`is`(4)) }
+            .map { VertxMatcherAssert.assertThat(testContext, it.size(), Matchers.`is`(3)) }
             .doOnSuccess { logger.info { "rxGetApod succeeded" } }
             .subscribe({ testContext.completeNow() }) { testContext.failNow(it) }
     }
