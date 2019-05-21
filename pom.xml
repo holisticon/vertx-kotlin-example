@@ -27,12 +27,13 @@
         <hamcrest.version>2.1</hamcrest.version>
 
         <maven-shade-plugin.version>3.2.1</maven-shade-plugin.version>
-        <maven-surefire-plugin.version>2.22.1</maven-surefire-plugin.version>
-        <jacoco-maven-plugin.version>0.8.2</jacoco-maven-plugin.version>
-        <codacy-maven-plugin.version>1.1.0</codacy-maven-plugin.version>
-        <openapi-generator-maven-plugin.version>3.3.4</openapi-generator-maven-plugin.version>
-        <maven-compiler-plugin.version>3.8.0</maven-compiler-plugin.version>
+        <maven-surefire-plugin.version>2.22.2</maven-surefire-plugin.version>
+        <jacoco-maven-plugin.version>0.8.4</jacoco-maven-plugin.version>
+        <codacy-maven-plugin.version>1.2.0</codacy-maven-plugin.version>
+        <openapi-generator-maven-plugin.version>4.0.0</openapi-generator-maven-plugin.version>
+        <maven-compiler-plugin.version>3.8.1</maven-compiler-plugin.version>
         <gitflow-maven-plugin.version>1.11.0</gitflow-maven-plugin.version>
+        <moshi-kotlin.version>1.8.0</moshi-kotlin.version>
     </properties>
 
     <dependencyManagement>
@@ -155,6 +156,11 @@
             <groupId>org.ehcache</groupId>
             <artifactId>ehcache</artifactId>
             <version>${ehcache.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.squareup.moshi</groupId>
+            <artifactId>moshi-kotlin</artifactId>
+            <version>${moshi-kotlin.version}</version>
         </dependency>
     </dependencies>
     <profiles>
@@ -303,8 +309,6 @@
                     </execution>
                 </executions>
             </plugin>
-
-
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
