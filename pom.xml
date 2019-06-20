@@ -17,7 +17,7 @@
         <maven.compiler.target>11</maven.compiler.target>
 
         <kotlin-logging.version>1.6.26</kotlin-logging.version>
-        <kotlin.version>1.3.31</kotlin.version>
+        <kotlin.version>1.3.40</kotlin.version>
         <vertx.version>3.7.1</vertx.version>
         <slf4j-simple.version>1.7.26</slf4j-simple.version>
         <hsqldb.version>2.5.0</hsqldb.version>
@@ -31,7 +31,7 @@
         <maven-surefire-plugin.version>2.22.2</maven-surefire-plugin.version>
         <jacoco-maven-plugin.version>0.8.4</jacoco-maven-plugin.version>
         <codacy-maven-plugin.version>1.2.0</codacy-maven-plugin.version>
-        <openapi-generator-maven-plugin.version>4.0.0</openapi-generator-maven-plugin.version>
+        <openapi-generator-maven-plugin.version>4.0.2</openapi-generator-maven-plugin.version>
         <maven-compiler-plugin.version>3.8.1</maven-compiler-plugin.version>
         <gitflow-maven-plugin.version>1.12.0</gitflow-maven-plugin.version>
         <dockerfile-maven.version>1.4.10</dockerfile-maven.version>
