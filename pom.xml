@@ -255,7 +255,17 @@
                 <artifactId>kotlin-maven-plugin</artifactId>
                 <groupId>org.jetbrains.kotlin</groupId>
                 <configuration>
-                    <jvmTarget>1.8</jvmTarget>
+                    <jvmTarget>11</jvmTarget>
+                    <args>
+                        <arg>--add-modules</arg><arg>java.se</arg>
+                        <arg>--add-exports</arg><arg>java.base/jdk.internal.ref=ALL-UNNAMED</arg>
+                        <arg>--add-opens</arg><arg>java.base/java.lang</arg>
+                        <arg>--add-opens</arg><arg>jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED</arg>
+                        <arg>--add-opens</arg><arg>java.base/java.nio=ALL-UNNAMED</arg>
+                        <arg>--add-opens</arg><arg>java.base/sun.nio.ch=ALL-UNNAMED</arg>
+                        <arg>--add-opens</arg><arg>java.management/sun.management=ALL-UNNAMED</arg>
+                        <arg>--add-opens</arg><arg>jdk.management/com.sun.management.internal=ALL-UNNAMED</arg>
+                    </args>
                 </configuration>
                 <executions>
                     <execution>
