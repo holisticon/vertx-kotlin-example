@@ -1,0 +1,4 @@
+ignore:
+  - "**/MainVerticle.kt"
+  - "**/Constants.kt"
+  - "**/main.kt"
