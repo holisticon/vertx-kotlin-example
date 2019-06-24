@@ -6,8 +6,10 @@ import apodrating.model.ApodRequest
 import apodrating.model.RatingRequest
 import apodrating.model.asApod
 import apodrating.model.asRating
+import io.reactivex.Flowable
 import io.reactivex.Single
 import io.reactivex.schedulers.Schedulers
+import io.vertx.config.ConfigRetrieverOptions
 import io.vertx.core.DeploymentOptions
 import io.vertx.core.json.JsonObject
 import io.vertx.ext.unit.junit.Repeat
@@ -49,47 +51,48 @@ class ApodRatingVerticleTest {
 
     private lateinit var webClient: WebClient
 
+    private fun verticlesToBeDeployed(
+        vertx: Vertx,
+        config: JsonObject
+    ): Flowable<Single<String>> = Flowable
+        .fromIterable(
+            listOf(
+                vertx.rxDeployVerticle(MockServiceVerticle()),
+                vertx.rxDeployVerticle(
+                    ApodRatingVerticle(),
+                    DeploymentOptions(JsonObject().put("config", config))
+                )
+            )
+        ).subscribeOn(Schedulers.computation())
+
+    private fun configRetrieverOptions(): ConfigRetrieverOptions =
+        configRetrieverOptionsOf()
+            .addStore(
+                configStoreOptionsOf(
+                    type = "file",
+                    format = "properties",
+                    config = JsonObject()
+                        .put("path", "test.properties")
+                )
+            )
+
     /**
      * Prepare test by deploying the verticle.
      */
     @BeforeAll
-    @DisplayName("Deploy verticle ")
-    fun deployVerticle(vertx: Vertx, testContext: VertxTestContext) {
+    @DisplayName("Deploy verticles ")
+    fun deployVerticles(vertx: Vertx, testContext: VertxTestContext) {
         ConfigRetriever
-            .create(
-                Vertx.vertx(), configRetrieverOptionsOf()
-                    .addStore(
-                        configStoreOptionsOf(
-                            type = "file",
-                            format = "properties",
-                            config = JsonObject()
-                                .put("path", "test.properties")
-                        )
-                    )
-            )
-            .configStream()
-            .handler { config ->
-                Single.zip<String, List<String>>(
-                    listOf(
-                        vertx.rxDeployVerticle(MockServiceVerticle()),
-                        vertx.rxDeployVerticle(
-                            ApodRatingVerticle(),
-                            DeploymentOptions(JsonObject().put("config", config))
-                        ),
-                        vertx.rxDeployVerticle(
-                            ApodRemoteProxyVerticle(),
-                            DeploymentOptions(JsonObject().put("config", config))
-                        )
-                    )
-                ) { it.filterIsInstance<String>() }
-                    .doAfterSuccess { testConfig = ApodRatingConfiguration(config) }
-                    .doAfterSuccess { webClient = WebClient.create(vertx) }
-                    .subscribeOn(Schedulers.io())
-                    .subscribe({
-                        testContext.completeNow()
-                    }) { error -> logger.error { error } }
-
-            }
+            .create(vertx, configRetrieverOptions())
+            .rxGetConfig().observeOn(Schedulers.computation())
+            .toFlowable().doAfterNext { testConfig = ApodRatingConfiguration(it) }
+            .flatMap { verticlesToBeDeployed(vertx, it) }
+            .parallel().runOn(Schedulers.computation())
+            .flatMap { it.toFlowable() }
+            .sequential().toList()
+            .doAfterSuccess { webClient = WebClient.create(vertx) }
+            .subscribeOn(Schedulers.computation())
+            .subscribe({ testContext.completeNow() }) { error -> logger.error { error } }
     }
 
     /**
@@ -198,6 +201,7 @@ class ApodRatingVerticleTest {
                 logger.info { "undeploying $it" }
                 it
             }
+
             .map { vertx.rxUndeploy(it) }
             .sequential()
             .toList()

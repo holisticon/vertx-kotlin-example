@@ -1,22 +1,35 @@
-package apodrating
+package apodrating.remoteproxy
 
+import apodrating.CACHE_ALIAS
+import apodrating.CIRCUIT_BREAKER_NAME
+import apodrating.FIELD_DATE
+import apodrating.HEAP_POOL_SIZE
+import apodrating.PARAM_API_KEY
+import apodrating.PARAM_HD
 import apodrating.model.Apod
 import apodrating.model.ApodRatingConfiguration
 import apodrating.model.asApod
 import apodrating.model.emptyApod
 import apodrating.model.isEmpty
 import apodrating.model.toJsonObject
+import apodrating.webapi.handleFailure
+import io.reactivex.Maybe
 import io.reactivex.Single
+import io.reactivex.schedulers.Schedulers
+import io.vertx.core.AsyncResult
 import io.vertx.core.Future
+import io.vertx.core.Handler
 import io.vertx.core.json.JsonObject
 import io.vertx.kotlin.circuitbreaker.circuitBreakerOptionsOf
-import io.vertx.kotlin.coroutines.CoroutineVerticle
 import io.vertx.reactivex.circuitbreaker.CircuitBreaker
 import io.vertx.reactivex.core.Vertx
 import io.vertx.reactivex.ext.web.client.WebClient
 import io.vertx.reactivex.ext.web.client.predicate.ResponsePredicate
 import io.vertx.reactivex.ext.web.codec.BodyCodec
-import kotlinx.coroutines.launch
+import io.vertx.serviceproxy.ServiceException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.runBlocking
 import mu.KLogging
 import org.apache.http.HttpStatus
 import org.ehcache.Cache
@@ -26,29 +39,22 @@ import org.ehcache.config.builders.ResourcePoolsBuilder
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * Implementation of a remote proxy for the APOD API.
+ * Service implementation to access the remote NASA apod api.
  */
-class ApodRemoteProxyVerticle : CoroutineVerticle() {
+class RemoteProxyServiceImpl(
+    vertx: Vertx, val config: JsonObject,
+    private val apodConfig: ApodRatingConfiguration = ApodRatingConfiguration(config)
+) : RemoteProxyService {
 
     companion object : KLogging()
 
-    private lateinit var rxVertx: Vertx
     private lateinit var circuitBreaker: CircuitBreaker
     private lateinit var webClient: WebClient
     private lateinit var apodCache: Cache<String, Apod>
-    private lateinit var apodConfig: ApodRatingConfiguration
 
-    /**
-     * - Start the verticle.
-     * - Initialize Database
-     * - Initialize vertx router
-     * - Initialize webserver
-     */
-    override fun start(startFuture: Future<Void>?) {
-        rxVertx = Vertx(vertx)
-        launch {
-            launch {
-                apodConfig = ApodRatingConfiguration(config)
+    init {
+        runBlocking {
+            val cacheRoutine = async {
                 CacheManagerBuilder.newCacheManagerBuilder()
                     .withCache(
                         CACHE_ALIAS,
@@ -67,11 +73,11 @@ class ApodRemoteProxyVerticle : CoroutineVerticle() {
                             Apod::class.java
                         )
                     }
-            }.join()
+            }
 
-            launch {
+            val circuitbreakerRoutine = async {
                 circuitBreaker = CircuitBreaker.create(
-                    CIRCUIT_BREAKER_NAME, rxVertx,
+                    CIRCUIT_BREAKER_NAME, vertx,
                     circuitBreakerOptionsOf(
                         maxFailures = 3, // number of failures before opening the circuit
                         timeout = 2000L, // consider a failure if the operation does not succeed in time
@@ -80,44 +86,52 @@ class ApodRemoteProxyVerticle : CoroutineVerticle() {
                         maxRetries = 3 // the number of times the circuit breaker tries to redo the operation before failing
                     )
                 )
-            }.join()
+            }
 
-            launch {
-                webClient = WebClient.create(rxVertx)
-            }.join()
+            val webClientRoutine = async {
+                webClient = WebClient.create(vertx)
+            }
 
-            rxVertx.eventBus()
-                .consumer<JsonObject>(EVENTBUS_ADDRESS) { message ->
-                    val id: String = message.body().getString("id")
-                    val dateString: String = message.body().getString("date")
-                    val nasaApiKey: String = message.body().getString("nasaApiKey")
-                    performApodQuery(id, dateString, nasaApiKey).subscribe({
-                        when {
-                            it == null || it.isEmpty() -> message.fail(
-                                HttpStatus.SC_SERVICE_UNAVAILABLE,
-                                "APOD API is temporarily not available"
-                            )
-                            else -> message.reply(it.toJsonObject())
-                        }
-                    }) {
-                        logger.error { it }
-                        message.fail(HttpStatus.SC_INTERNAL_SERVER_ERROR, "Server error")
-                    }
-                }
-            startFuture?.tryComplete()
-            logger.info { "Proxy started" }
+            cacheRoutine.await()
+            circuitbreakerRoutine.await()
+            webClientRoutine.await()
         }
     }
 
-    private fun performApodQuery(id: String, date: String, nasaApiKey: String): Single<Apod> = when {
-        apodCache.containsKey(date) -> Single
-            .just(apodCache.get(date))
-            .doOnSuccess { logger.info { "cache hit: $id" } }
-        else -> with(AtomicInteger()) {
+    override fun performApodQuery(
+        id: String,
+        date: String,
+        nasaApiKey: String,
+        resultHandler: Handler<AsyncResult<JsonObject>>
+    ): RemoteProxyService {
+        getFromCacheOrRemoteApi(id, date, nasaApiKey)
+            .filter { it.isEmpty().not() }
+            .map { Future.succeededFuture(it.toJsonObject()) }
+            .switchIfEmpty(
+                Maybe.just(
+                    Future.failedFuture(
+                        ServiceException(
+                            HttpStatus.SC_NOT_FOUND,
+                            "not found"
+                        )
+                    )
+                )
+            )
+            .subscribeOn(Schedulers.io())
+            .subscribe(resultHandler::handle) {
+                handleFailure(resultHandler, it, HttpStatus.SC_INTERNAL_SERVER_ERROR)
+            }
+        return this
+    }
+
+    private fun getFromCacheOrRemoteApi(id: String, date: String, nasaApiKey: String): Single<Apod> {
+        apodCache.get(date)?.let { return Single.just(it) }
+        return with(AtomicInteger()) {
             circuitBreaker.rxExecuteCommandWithFallback<Apod>({ future ->
                 if (this.getAndIncrement() > 0)
                     logger.info { "number of retries: ${this.get() - 1}" }
                 rxSendGet(date, nasaApiKey, id)
+                    .subscribeOn(Schedulers.io())
                     .doOnSuccess {
                         if (!apodCache.containsKey(date)) {
                             apodCache.put(date, it)
@@ -129,19 +143,27 @@ class ApodRemoteProxyVerticle : CoroutineVerticle() {
                 emptyApod()
             }
         }
-
     }
 
     private fun rxSendGet(date: String, nasaApiKey: String, apodId: String): Single<Apod> =
-        webClient.getAbs(apodConfig.nasaApiHost)
+        runBlocking(Dispatchers.IO) { webClient.getAbs(apodConfig.nasaApiHost) }
             .uri(apodConfig.nasaApiPath)
-            .addQueryParam("date", date)
-            .addQueryParam("api_key", nasaApiKey)
-            .addQueryParam("hd", true.toString())
+            .addQueryParam(FIELD_DATE, date)
+            .addQueryParam(PARAM_API_KEY, nasaApiKey)
+            .addQueryParam(PARAM_HD, true.toString())
             .expect(ResponsePredicate.SC_SUCCESS)
             .expect(ResponsePredicate.JSON)
             .`as`(BodyCodec.jsonObject())
             .rxSend()
             .map { it.body() }
             .map { asApod(apodId, it) }
+
+    /**
+     * close resources
+     */
+    override fun close() {
+        webClient.close()
+        circuitBreaker.close()
+        apodCache.clear()
+    }
 }

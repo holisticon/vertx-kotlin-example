@@ -8,9 +8,14 @@ servers:
   - url: https://localhost:8443
 paths:
   /apod:
+    x-vertx-event-bus:
+      address: apod_query_service.apod
+      timeout: 2000
     post:
       summary: create an apod with the specified date
       operationId: postApod
+      x-vertx-event-bus:
+        method: postApod
       security:
         - ApiKeyAuth: []
       tags:
@@ -45,6 +50,8 @@ paths:
     get:
       summary: get all apods
       operationId: getApods
+      x-vertx-event-bus:
+        method: getApods
       security:
         - ApiKeyAuth: []
       tags:
@@ -72,9 +79,14 @@ paths:
                 $ref: '#/components/schemas/Error'
 
   /apod/{apodId}:
+    x-vertx-event-bus:
+      address: apod_query_service.apod
+      timeout: 2000
     get:
       summary: get an apod for the specified date
       operationId: getApodForDate
+      x-vertx-event-bus:
+        method: getApodForDate
       security:
         - ApiKeyAuth: []
       tags:
@@ -113,9 +125,14 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
   /apod/{apodId}/rating:
+    x-vertx-event-bus:
+      address: rating_service.apod
+      timeout: 2000
     get:
       summary: get apod rating
       operationId: getRating
+      x-vertx-event-bus:
+        method: getRating
       tags:
         - apodrating
       parameters:
@@ -160,6 +177,8 @@ paths:
     put:
       summary: set apod rating
       operationId: putRating
+      x-vertx-event-bus:
+        method: putRating
       tags:
         - apodrating
       parameters:
