@@ -256,6 +256,10 @@
                 <groupId>org.jetbrains.kotlin</groupId>
                 <configuration>
                     <jvmTarget>11</jvmTarget>
+                    <javacOptions>
+                        <option>--add-opens</option>
+                        <option>jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED</option>
+                    </javacOptions>
                 </configuration>
                 <executions>
                     <execution>
@@ -349,6 +353,8 @@
                         <arg>java.management/sun.management=ALL-UNNAMED</arg>
                         <arg>--add-opens</arg>
                         <arg>jdk.management/com.sun.management.internal=ALL-UNNAMED</arg>
+                        <arg>--add-opens</arg>
+                        <arg>jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED</arg>
                     </compilerArgs>
                 </configuration>
                 <executions>
