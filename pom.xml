@@ -554,9 +554,8 @@
                         <supportBranchPrefix>support/</supportBranchPrefix>
                         <versionTagPrefix></versionTagPrefix>
                         <origin>origin</origin>
-                        <skipTestProject>true</skipTestProject>
                     </gitFlowConfig>
-
+                    <skipTestProject>true</skipTestProject>
                 </configuration>
             </plugin>
         </plugins>
