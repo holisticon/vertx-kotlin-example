@@ -6,7 +6,7 @@
 
     <groupId>de.holisticon</groupId>
     <artifactId>kotlin-example-coroutines</artifactId>
-    <version>1.0.15</version>
+    <version>1.0.16</version>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -27,6 +27,7 @@
         <hamcrest.version>2.1</hamcrest.version>
         <moshi-kotlin.version>1.8.0</moshi-kotlin.version>
         <c3p0.version>0.9.5.4</c3p0.version>
+        <jackson.version>2.9.9.1</jackson.version>
 
         <maven-surefire-plugin.version>2.22.2</maven-surefire-plugin.version>
         <jacoco-maven-plugin.version>0.8.4</jacoco-maven-plugin.version>
@@ -135,6 +136,12 @@
         </dependency>
 
         <dependency>
+            <groupId>org.apache.httpcomponents</groupId>
+            <artifactId>httpclient</artifactId>
+            <version>4.5.9</version>
+        </dependency>
+
+        <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-api</artifactId>
             <version>${junit-jupiter.version}</version>
@@ -171,7 +178,11 @@
             <artifactId>ehcache</artifactId>
             <version>${ehcache.version}</version>
         </dependency>
-
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>${jackson.version}</version>
+        </dependency>
         <dependency>
             <groupId>com.squareup.moshi</groupId>
             <artifactId>moshi-kotlin</artifactId>
