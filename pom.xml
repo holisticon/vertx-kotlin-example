@@ -6,7 +6,7 @@
 
     <groupId>de.holisticon</groupId>
     <artifactId>kotlin-example-coroutines</artifactId>
-    <version>1.0.16</version>
+    <version>1.0.17</version>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -17,17 +17,16 @@
         <maven.compiler.target>11</maven.compiler.target>
 
         <kotlin-logging.version>1.6.26</kotlin-logging.version>
-        <kotlin.version>1.3.40</kotlin.version>
-        <vertx.version>3.7.1</vertx.version>
+        <kotlin.version>1.3.41</kotlin.version>
+        <vertx.version>3.8.0</vertx.version>
         <slf4j-simple.version>1.7.26</slf4j-simple.version>
         <hsqldb.version>2.5.0</hsqldb.version>
-        <junit-jupiter.version>5.4.2</junit-jupiter.version>
-        <junit-platform.version>1.4.2</junit-platform.version>
+        <junit-jupiter.version>5.5.0</junit-jupiter.version>
+        <junit-platform.version>1.5.0</junit-platform.version>
         <ehcache.version>3.7.1</ehcache.version>
         <hamcrest.version>2.1</hamcrest.version>
         <moshi-kotlin.version>1.8.0</moshi-kotlin.version>
         <c3p0.version>0.9.5.4</c3p0.version>
-        <jackson.version>2.9.9.1</jackson.version>
 
         <maven-surefire-plugin.version>2.22.2</maven-surefire-plugin.version>
         <jacoco-maven-plugin.version>0.8.4</jacoco-maven-plugin.version>
@@ -177,11 +176,6 @@
             <groupId>org.ehcache</groupId>
             <artifactId>ehcache</artifactId>
             <version>${ehcache.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-            <version>${jackson.version}</version>
         </dependency>
         <dependency>
             <groupId>com.squareup.moshi</groupId>
