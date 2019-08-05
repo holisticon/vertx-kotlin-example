@@ -9,8 +9,8 @@ import apodrating.webapi.ApodQueryService
 import apodrating.webapi.ApodQueryServiceImpl
 import apodrating.webapi.RatingService
 import apodrating.webapi.RatingServiceImpl
-import io.vertx.core.Future
 import io.vertx.core.Handler
+import io.vertx.core.Promise
 import io.vertx.core.http.HttpServerOptions
 import io.vertx.ext.jdbc.JDBCClient
 import io.vertx.kotlin.core.net.pemKeyCertOptionsOf
@@ -33,6 +33,29 @@ import org.apache.http.HttpStatus
 /**
  * Implements our REST interface
  */
+
+val statements = listOf(
+    "CREATE TABLE APOD (ID INTEGER IDENTITY PRIMARY KEY, DATE_STRING VARCHAR(16))",
+    "CREATE TABLE RATING (ID INTEGER IDENTITY PRIMARY KEY, VALUE INTEGER, APOD_ID INTEGER, FOREIGN KEY (APOD_ID) REFERENCES APOD(ID))",
+    "INSERT INTO APOD (DATE_STRING) VALUES '2019-01-10'",
+    "INSERT INTO APOD (DATE_STRING) VALUES '2018-07-01'",
+    "INSERT INTO APOD (DATE_STRING) VALUES '2017-01-01'",
+//                "INSERT INTO APOD (DATE_STRING) VALUES '2016-01-01'",
+//                "INSERT INTO APOD (DATE_STRING) VALUES '2015-01-01'",
+//                "INSERT INTO APOD (DATE_STRING) VALUES '2019-02-01'",
+//                "INSERT INTO APOD (DATE_STRING) VALUES '2019-02-02'",
+//                "INSERT INTO APOD (DATE_STRING) VALUES '2019-02-03'",
+//                "INSERT INTO APOD (DATE_STRING) VALUES '2017-07-01'",
+//                "INSERT INTO APOD (DATE_STRING) VALUES '2012-06-12'",
+    "INSERT INTO RATING (VALUE, APOD_ID) VALUES 8, 0",
+    "INSERT INTO RATING (VALUE, APOD_ID) VALUES 5, 1",
+    "INSERT INTO RATING (VALUE, APOD_ID) VALUES 7, 2",
+    "INSERT INTO RATING (VALUE, APOD_ID) VALUES 8, 0",
+    "INSERT INTO RATING (VALUE, APOD_ID) VALUES 5, 1",
+    "INSERT INTO RATING (VALUE, APOD_ID) VALUES 7, 2",
+    "ALTER TABLE APOD ADD CONSTRAINT APOD_UNIQUE UNIQUE(DATE_STRING)"
+)
+
 class ApodRatingVerticle : CoroutineVerticle() {
 
     companion object : KLogging()
@@ -47,7 +70,7 @@ class ApodRatingVerticle : CoroutineVerticle() {
      * - Initialize vertx router
      * - Initialize webserver
      */
-    override fun start(startFuture: Future<Void>?) {
+    override fun start(startFuture: Promise<Void>?) {
         launch {
             val apodConfig = ApodRatingConfiguration(config)
             val jdbcRoutine = async {
@@ -55,27 +78,7 @@ class ApodRatingVerticle : CoroutineVerticle() {
             }
             apiKey = apodConfig.nasaApiKey
             rxVertx = Vertx(vertx)
-            val statements = listOf(
-                "CREATE TABLE APOD (ID INTEGER IDENTITY PRIMARY KEY, DATE_STRING VARCHAR(16))",
-                "CREATE TABLE RATING (ID INTEGER IDENTITY PRIMARY KEY, VALUE INTEGER, APOD_ID INTEGER, FOREIGN KEY (APOD_ID) REFERENCES APOD(ID))",
-                "INSERT INTO APOD (DATE_STRING) VALUES '2019-01-10'",
-                "INSERT INTO APOD (DATE_STRING) VALUES '2018-07-01'",
-                "INSERT INTO APOD (DATE_STRING) VALUES '2017-01-01'",
-//                "INSERT INTO APOD (DATE_STRING) VALUES '2016-01-01'",
-//                "INSERT INTO APOD (DATE_STRING) VALUES '2015-01-01'",
-//                "INSERT INTO APOD (DATE_STRING) VALUES '2019-02-01'",
-//                "INSERT INTO APOD (DATE_STRING) VALUES '2019-02-02'",
-//                "INSERT INTO APOD (DATE_STRING) VALUES '2019-02-03'",
-//                "INSERT INTO APOD (DATE_STRING) VALUES '2017-07-01'",
-//                "INSERT INTO APOD (DATE_STRING) VALUES '2012-06-12'",
-                "INSERT INTO RATING (VALUE, APOD_ID) VALUES 8, 0",
-                "INSERT INTO RATING (VALUE, APOD_ID) VALUES 5, 1",
-                "INSERT INTO RATING (VALUE, APOD_ID) VALUES 7, 2",
-                "INSERT INTO RATING (VALUE, APOD_ID) VALUES 8, 0",
-                "INSERT INTO RATING (VALUE, APOD_ID) VALUES 5, 1",
-                "INSERT INTO RATING (VALUE, APOD_ID) VALUES 7, 2",
-                "ALTER TABLE APOD ADD CONSTRAINT APOD_UNIQUE UNIQUE(DATE_STRING)"
-            )
+
             val serviceRoutine = async {
                 with(ServiceBinder(vertx)) {
                     this.setAddress(RATING_SERVICE_ADDRESS).register(
@@ -129,7 +132,7 @@ class ApodRatingVerticle : CoroutineVerticle() {
 
     private fun startHttpServer(
         port: Int,
-        startFuture: Future<Void>?,
+        startFuture: Promise<Void>?,
         httpServerOptions: HttpServerOptions? = null
     ): suspend CoroutineScope.() -> Unit = {
         OpenAPI3RouterFactory.rxCreate(rxVertx, "swagger.yaml")

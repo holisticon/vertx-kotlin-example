@@ -1,7 +1,7 @@
 package apodrating.mock
 
 import apodrating.mock.model.MockApod
-import io.vertx.core.Future
+import io.vertx.core.Promise
 import io.vertx.kotlin.coroutines.CoroutineVerticle
 import io.vertx.reactivex.core.Vertx
 import io.vertx.reactivex.ext.web.RoutingContext
@@ -21,7 +21,7 @@ class MockServiceVerticle : CoroutineVerticle() {
 
     private lateinit var rxVertx: Vertx
 
-    override fun start(startFuture: Future<Void>?) {
+    override fun start(startFuture: Promise<Void>?) {
         launch {
             rxVertx = Vertx(vertx)
             withContext(
@@ -33,7 +33,7 @@ class MockServiceVerticle : CoroutineVerticle() {
 
     private fun rxStartHttpServer(
         port: Int,
-        startFuture: Future<Void>?
+        startFuture: Promise<Void>?
     ): suspend CoroutineScope.() -> Unit = {
         OpenAPI3RouterFactory.rxCreate(rxVertx, "mock-api.yaml")
             .map {
