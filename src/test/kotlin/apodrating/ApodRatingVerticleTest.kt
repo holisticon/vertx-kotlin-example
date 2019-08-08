@@ -33,8 +33,13 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import org.junit.jupiter.api.TestMethodOrder
 import org.junit.jupiter.api.extension.ExtendWith
+import java.util.concurrent.TimeUnit
 
 private const val LOCALHOST: String = "localhost"
+
+private const val RETRY_COUNT: Long = 5
+
+private const val DELAY_MS: Long = 100
 
 /**
  * Unit test for ApodRatingVerticle
@@ -57,7 +62,10 @@ class ApodRatingVerticleTest {
     ): Flowable<Single<String>> = Flowable
         .fromIterable(
             listOf(
-                vertx.rxDeployVerticle(MockServiceVerticle()),
+                vertx.rxDeployVerticle(
+                    MockServiceVerticle(),
+                    DeploymentOptions(JsonObject().put("config", config))
+                ),
                 vertx.rxDeployVerticle(
                     ApodRatingVerticle(),
                     DeploymentOptions(JsonObject().put("config", config))
@@ -107,10 +115,10 @@ class ApodRatingVerticleTest {
             .putHeader(API_KEY_HEADER, testConfig.nasaApiKey)
             .`as`(BodyCodec.jsonObject())
             .rxSend()
+            .retryWhen { throwableOccurs(it) }
             .map { it.body() }
             .map { asApod(it).id }
             .map { VertxMatcherAssert.assertThat(testContext, it, Matchers.`is`("0")) }
-            .doOnSuccess { logger.info { "rxGetApod/o succeeded" } }
             .subscribe({ testContext.completeNow() }) { testContext.failNow(it) }
     }
 
@@ -127,9 +135,9 @@ class ApodRatingVerticleTest {
             .putHeader(API_KEY_HEADER, testConfig.nasaApiKey)
             .`as`(BodyCodec.jsonArray())
             .rxSend()
+            .retryWhen { throwableOccurs(it) }
             .map { it.body() }
             .map { VertxMatcherAssert.assertThat(testContext, it.size(), Matchers.`is`(3)) }
-            .doOnSuccess { logger.info { "rxGetApod succeeded" } }
             .subscribe({ testContext.completeNow() }) { testContext.failNow(it) }
     }
 
@@ -145,9 +153,9 @@ class ApodRatingVerticleTest {
             .post(testConfig.port, LOCALHOST, "/apod")
             .putHeader(API_KEY_HEADER, testConfig.nasaApiKey)
             .rxSendJson(JsonObject.mapFrom(ApodRequest("2018-02-02")))
+            .retryWhen { throwableOccurs(it) }
             .map { it.statusCode() }
             .map { VertxMatcherAssert.assertThat(testContext, it, Matchers.`is`(HttpStatus.SC_CREATED)) }
-            .doOnSuccess { logger.info { "rxPostApod succeeded" } }
             .subscribe({ testContext.completeNow() }) { testContext.failNow(it) }
     }
 
@@ -163,9 +171,9 @@ class ApodRatingVerticleTest {
             .put(testConfig.port, LOCALHOST, "/apod/0/rating")
             .putHeader(API_KEY_HEADER, testConfig.nasaApiKey)
             .rxSendJsonObject(JsonObject.mapFrom(RatingRequest(7)))
+            .retryWhen { throwableOccurs(it) }
             .map { it.statusCode() }
             .map { VertxMatcherAssert.assertThat(testContext, it, Matchers.`is`(HttpStatus.SC_NO_CONTENT)) }
-            .doOnSuccess { logger.info { "rxPUTrating succeeded" } }
             .subscribe({ testContext.completeNow() }) { testContext.failNow(it) }
     }
 
@@ -181,12 +189,17 @@ class ApodRatingVerticleTest {
             .get(testConfig.port, LOCALHOST, "/apod/0/rating")
             .`as`(BodyCodec.jsonObject())
             .rxSend()
+            .retryWhen { throwableOccurs(it) }
             .map { it.body() }
             .map { asRating(it).id }
             .map { VertxMatcherAssert.assertThat(testContext, it, Matchers.`is`(0)) }
-            .doOnSuccess { logger.info { "rxGETrating succeeded" } }
             .subscribe({ testContext.completeNow() }) { testContext.failNow(it) }
     }
+
+    private fun throwableOccurs(throwable: Flowable<Throwable>) =
+        throwable
+            .take(RETRY_COUNT)
+            .delay(DELAY_MS, TimeUnit.MILLISECONDS)
 
     /**
      * Undeply Verticle.
@@ -197,11 +210,6 @@ class ApodRatingVerticleTest {
         Single.just(vertx.deploymentIDs())
             .flattenAsFlowable { it }
             .parallel().runOn(Schedulers.computation())
-            .map {
-                logger.info { "undeploying $it" }
-                it
-            }
-
             .map { vertx.rxUndeploy(it) }
             .sequential()
             .toList()

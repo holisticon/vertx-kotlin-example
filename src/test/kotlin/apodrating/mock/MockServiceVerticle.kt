@@ -25,7 +25,7 @@ class MockServiceVerticle : CoroutineVerticle() {
         launch {
             rxVertx = Vertx(vertx)
             withContext(
-                Dispatchers.IO, rxStartHttpServer(8091, startFuture)
+                Dispatchers.IO, rxStartHttpServer(config.getInteger("MOCKSERVER_PORT"), startFuture)
             )
         }
         startFuture?.complete()
