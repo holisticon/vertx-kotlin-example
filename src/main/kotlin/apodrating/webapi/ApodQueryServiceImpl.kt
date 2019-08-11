@@ -25,9 +25,6 @@ import io.vertx.kotlin.core.json.get
 import io.vertx.kotlin.core.json.json
 import io.vertx.reactivex.core.Vertx
 import io.vertx.reactivex.ext.jdbc.JDBCClient
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
 import mu.KLogging
 import org.apache.http.HttpStatus
 import java.sql.SQLIntegrityConstraintViolationException
@@ -55,12 +52,10 @@ class ApodQueryServiceImpl(
         apodId: String,
         context: OperationRequest,
         resultHandler: Handler<AsyncResult<OperationResponse>>
-    ) = runBlocking<Unit> {
-        withContext(Dispatchers.IO) {
-            jdbc.rxQuerySingleWithParams("SELECT ID, DATE_STRING FROM APOD WHERE ID=?",
-                json { array(apodId) }
-            )
-        }
+    ) {
+        jdbc.rxQuerySingleWithParams("SELECT ID, DATE_STRING FROM APOD WHERE ID=?",
+            json { array(apodId) }
+        )
             .flatMap {
                 proxyService.rxPerformApodQuery(
                     it.getInteger(0).toString(),
@@ -80,13 +75,11 @@ class ApodQueryServiceImpl(
         body: JsonObject,
         context: OperationRequest,
         resultHandler: Handler<AsyncResult<OperationResponse>>
-    ) = runBlocking<Unit> {
+    ) {
         val apodRequest = asApodRequest(body)
         val apiKeyHeader = context.headers[API_KEY_HEADER]
-        withContext(Dispatchers.IO) {
-            jdbc.rxUpdateWithParams("INSERT INTO APOD (DATE_STRING) VALUES ?",
-                json { array(apodRequest.dateString) })
-        }
+        jdbc.rxUpdateWithParams("INSERT INTO APOD (DATE_STRING) VALUES ?",
+            json { array(apodRequest.dateString) })
             .map { it.keys.get<Int>(0) }
             .flatMap {
                 proxyService.rxPerformApodQuery(
@@ -113,36 +106,33 @@ class ApodQueryServiceImpl(
      * Handle a GET request for all APODs in our database.
      *
      */
-    override fun getApods(context: OperationRequest, resultHandler: Handler<AsyncResult<OperationResponse>>) =
-        runBlocking<Unit> {
-            withContext(Dispatchers.IO) {
-                jdbc.rxQuery("SELECT ID, DATE_STRING FROM APOD ")
+    override fun getApods(context: OperationRequest, resultHandler: Handler<AsyncResult<OperationResponse>>) {
+        jdbc.rxQuery("SELECT ID, DATE_STRING FROM APOD ")
+            .observeOn(Schedulers.computation())
+            .map { it.rows.toList() }
+            .filter { it.isEmpty().not() }
+            .flattenAsFlowable { it }
+            .parallel()
+            .runOn(Schedulers.io())
+            .flatMap {
+                proxyService.rxPerformApodQuery(
+                    it.getInteger("ID").toString(),
+                    it.getString("DATE_STRING"),
+                    context.headers.get(API_KEY_HEADER)
+                ).toFlowable()
             }
-                .observeOn(Schedulers.computation())
-                .map { it.rows.toList() }
-                .filter { it.isEmpty().not() }
-                .flattenAsFlowable { it }
-                .parallel()
-                .runOn(Schedulers.io())
-                .flatMap {
-                    proxyService.rxPerformApodQuery(
-                        it.getInteger("ID").toString(),
-                        it.getString("DATE_STRING"),
-                        context.headers.get(API_KEY_HEADER)
-                    ).toFlowable()
-                }
-                .map { asApod(it) }
-                .filter { !it.isEmpty() }
-                .sequential()
-                .toList()
-                .toMaybe()
-                .map { Future.succeededFuture(OperationResponse.completedWithJson(Json.array(it))) }
-                .switchIfEmpty(Maybe.just(Future.succeededFuture(OperationResponse.completedWithJson(JsonArray()))))
-                .subscribeOn(Schedulers.io())
-                .subscribe(resultHandler::handle) {
-                    handleFailure(resultHandler, it, HttpStatus.SC_INTERNAL_SERVER_ERROR)
-                }
-        }
+            .map { asApod(it) }
+            .filter { !it.isEmpty() }
+            .sequential()
+            .toList()
+            .toMaybe()
+            .map { Future.succeededFuture(OperationResponse.completedWithJson(Json.array(it))) }
+            .switchIfEmpty(Maybe.just(Future.succeededFuture(OperationResponse.completedWithJson(JsonArray()))))
+            .subscribeOn(Schedulers.io())
+            .subscribe(resultHandler::handle) {
+                handleFailure(resultHandler, it, HttpStatus.SC_INTERNAL_SERVER_ERROR)
+            }
+    }
 
     /**
      * close resources

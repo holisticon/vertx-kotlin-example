@@ -33,29 +33,6 @@ import org.apache.http.HttpStatus
 /**
  * Implements our REST interface
  */
-
-val statements = listOf(
-    "CREATE TABLE APOD (ID INTEGER IDENTITY PRIMARY KEY, DATE_STRING VARCHAR(16))",
-    "CREATE TABLE RATING (ID INTEGER IDENTITY PRIMARY KEY, VALUE INTEGER, APOD_ID INTEGER, FOREIGN KEY (APOD_ID) REFERENCES APOD(ID))",
-    "INSERT INTO APOD (DATE_STRING) VALUES '2019-01-10'",
-    "INSERT INTO APOD (DATE_STRING) VALUES '2018-07-01'",
-    "INSERT INTO APOD (DATE_STRING) VALUES '2017-01-01'",
-//                "INSERT INTO APOD (DATE_STRING) VALUES '2016-01-01'",
-//                "INSERT INTO APOD (DATE_STRING) VALUES '2015-01-01'",
-//                "INSERT INTO APOD (DATE_STRING) VALUES '2019-02-01'",
-//                "INSERT INTO APOD (DATE_STRING) VALUES '2019-02-02'",
-//                "INSERT INTO APOD (DATE_STRING) VALUES '2019-02-03'",
-//                "INSERT INTO APOD (DATE_STRING) VALUES '2017-07-01'",
-//                "INSERT INTO APOD (DATE_STRING) VALUES '2012-06-12'",
-    "INSERT INTO RATING (VALUE, APOD_ID) VALUES 8, 0",
-    "INSERT INTO RATING (VALUE, APOD_ID) VALUES 5, 1",
-    "INSERT INTO RATING (VALUE, APOD_ID) VALUES 7, 2",
-    "INSERT INTO RATING (VALUE, APOD_ID) VALUES 8, 0",
-    "INSERT INTO RATING (VALUE, APOD_ID) VALUES 5, 1",
-    "INSERT INTO RATING (VALUE, APOD_ID) VALUES 7, 2",
-    "ALTER TABLE APOD ADD CONSTRAINT APOD_UNIQUE UNIQUE(DATE_STRING)"
-)
-
 class ApodRatingVerticle : CoroutineVerticle() {
 
     companion object : KLogging()
@@ -97,7 +74,7 @@ class ApodRatingVerticle : CoroutineVerticle() {
             val dbRoutine = async(Dispatchers.IO) {
                 jdbcRoutine.await()
                 client.getConnectionAwait().use { connection ->
-                    statements.forEach {
+                    STATEMENTS.forEach {
                         connection.executeAwait(it)
                     }
                 }
@@ -137,9 +114,9 @@ class ApodRatingVerticle : CoroutineVerticle() {
     ): suspend CoroutineScope.() -> Unit = {
         OpenAPI3RouterFactory.rxCreate(rxVertx, "swagger.yaml")
             .map { it.mountServicesFromExtensions() }
-            .map {
+            .map { routerFactory ->
                 (httpServerOptions?.let { rxVertx.createHttpServer(it) }
-                    ?: rxVertx.createHttpServer()).requestHandler(createRouter(it))
+                    ?: rxVertx.createHttpServer()).requestHandler(createRouter(routerFactory))
             }
             .flatMap { it.rxListen(port) }
             .subscribe({ logger.info { "server listens on port ${it.actualPort()}" } }) {

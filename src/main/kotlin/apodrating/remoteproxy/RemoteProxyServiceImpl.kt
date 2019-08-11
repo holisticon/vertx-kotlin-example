@@ -27,7 +27,6 @@ import io.vertx.reactivex.ext.web.client.WebClient
 import io.vertx.reactivex.ext.web.client.predicate.ResponsePredicate
 import io.vertx.reactivex.ext.web.codec.BodyCodec
 import io.vertx.serviceproxy.ServiceException
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import mu.KLogging
@@ -83,7 +82,8 @@ class RemoteProxyServiceImpl(
                         timeout = 2000L, // consider a failure if the operation does not succeed in time
                         fallbackOnFailure = true, // do we call the fallback on failure
                         resetTimeout = 1000, // time spent in open state before attempting to re-try
-                        maxRetries = 3 // the number of times the circuit breaker tries to redo the operation before failing
+                        maxRetries = 3 // the number of times the circuit breaker tries to redo the
+                        // operation before failing
                     )
                 )
             }
@@ -146,7 +146,7 @@ class RemoteProxyServiceImpl(
     }
 
     private fun rxSendGet(date: String, nasaApiKey: String, apodId: String): Single<Apod> =
-        runBlocking(Dispatchers.IO) { webClient.getAbs(apodConfig.nasaApiHost) }
+        webClient.getAbs(apodConfig.nasaApiHost)
             .uri(apodConfig.nasaApiPath)
             .addQueryParam(FIELD_DATE, date)
             .addQueryParam(PARAM_API_KEY, nasaApiKey)
