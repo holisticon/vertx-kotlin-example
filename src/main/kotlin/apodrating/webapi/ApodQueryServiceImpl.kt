@@ -62,7 +62,9 @@ class ApodQueryServiceImpl(
                     it.getString(1),
                     context.headers.get(API_KEY_HEADER)
                 ).subscribeOn(Schedulers.io()).toMaybe()
-            }.map { succeed(HttpStatus.SC_OK, asApod(it).toJsonObject()) }
+            }
+            .observeOn(Schedulers.computation())
+            .map { succeed(HttpStatus.SC_OK, asApod(it).toJsonObject()) }
             .switchIfEmpty(handleApodNotFound())
             .subscribeOn(Schedulers.io())
             .subscribe(resultHandler::handle) { handleFailure(resultHandler, it) }
@@ -88,6 +90,7 @@ class ApodQueryServiceImpl(
                     apiKeyHeader
                 ).subscribeOn(Schedulers.io())
             }
+            .observeOn(Schedulers.computation())
             .map { asApod(it) }
             .map { succeed(HttpStatus.SC_CREATED, LOCATION_HEADER, "/apod/${it.id}") }
             .onErrorReturn {
