@@ -101,6 +101,9 @@ Finally you can rate an apod
        -d "{\"rating\":9}"
 ```
 
+# Gatling tests
+In order to run load tests and performance analysis, use the [gatling](./gatling) project.
+
 # Further Reading
 
 * A good [introduction](https://medium.com/@elye.project/understanding-suspend-function-of-coroutines-de26b070c5ed) on Kotlin coroutines.
