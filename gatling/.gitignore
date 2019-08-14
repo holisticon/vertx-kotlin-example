@@ -1,0 +1,13 @@
+.idea/
+*.iml
+
+.settings/
+
+target/
+.env
+oc_deploy/
+.DS_Store
+.gitsecret/keys/random_seed
+file-uploads/
+file-downloads/
+gatling-test/dependency-reduced-pom.xml
