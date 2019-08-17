@@ -9,8 +9,18 @@ object Steps {
 
   val getExistingApods: HttpRequestBuilder = http("GET existing apod")
     .get("/apod")
-    .header("X-API-KEY", "toSgQoGTapxfoNs40DFk9Z2Z7YfgcuYNcZtZuT1S")
+    .header("X-API-KEY", Configuration.authHeader)
     .check(status.in(200))
 
+  val postNewApod: HttpRequestBuilder = http("POST new apod")
+    .post("/apod")
+    .header("X-API-KEY", Configuration.authHeader)
+    .body(StringBody(
+      """
+        | {
+        |   "dateString": "${datestring}"
+        | }
+        | """.stripMargin)).asJSON
+    .check(status.in(201, 409))
 
 }

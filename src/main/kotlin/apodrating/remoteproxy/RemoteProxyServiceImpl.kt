@@ -13,6 +13,7 @@ import apodrating.model.emptyApod
 import apodrating.model.isEmpty
 import apodrating.model.toJsonObject
 import apodrating.webapi.handleFailure
+import com.google.common.util.concurrent.RateLimiter
 import io.reactivex.Maybe
 import io.reactivex.Single
 import io.reactivex.schedulers.Schedulers
@@ -34,6 +35,7 @@ import org.apache.http.HttpStatus
 import org.ehcache.Cache
 import org.ehcache.config.builders.CacheConfigurationBuilder
 import org.ehcache.config.builders.CacheManagerBuilder
+import org.ehcache.config.builders.ExpiryPolicyBuilder
 import org.ehcache.config.builders.ResourcePoolsBuilder
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -50,6 +52,7 @@ class RemoteProxyServiceImpl(
     private lateinit var circuitBreaker: CircuitBreaker
     private lateinit var webClient: WebClient
     private lateinit var apodCache: Cache<String, Apod>
+    private val limiter = RateLimiter.create(3.0)
 
     init {
         runBlocking {
@@ -62,7 +65,7 @@ class RemoteProxyServiceImpl(
                                 String::class.java,
                                 Apod::class.java,
                                 ResourcePoolsBuilder.heap(HEAP_POOL_SIZE)
-                            )
+                            ).withExpiry(ExpiryPolicyBuilder.noExpiration())
                     ).build()
                     .apply {
                         this.init()
@@ -71,6 +74,7 @@ class RemoteProxyServiceImpl(
                             String::class.java,
                             Apod::class.java
                         )
+                        logger.info { " ############## cache created: ${apodCache.toString()}" }
                     }
             }
 
@@ -125,22 +129,29 @@ class RemoteProxyServiceImpl(
     }
 
     private fun getFromCacheOrRemoteApi(id: String, date: String, nasaApiKey: String): Single<Apod> {
-        apodCache.get(date)?.let { return Single.just(it) }
-        return with(AtomicInteger()) {
-            circuitBreaker.rxExecuteCommandWithFallback<Apod>({ future ->
-                if (this.getAndIncrement() > 0)
-                    logger.info { "number of retries: ${this.get() - 1}" }
-                rxSendGet(date, nasaApiKey, id)
-                    .subscribeOn(Schedulers.io())
-                    .doOnSuccess {
-                        if (!apodCache.containsKey(date)) {
-                            apodCache.put(date, it)
-                            logger.info { "added entry to cache: ${it.id}" }
-                        }
-                    }.subscribe({ future.complete(it) }) { future.fail(it) }
-            }) {
-                logger.error { "Circuit opened. Error: $it - message: ${it.message}" }
-                emptyApod()
+        val entry: Apod? = apodCache.get(date)
+        when {
+            entry != null -> {
+                logger.info { "Date $date cache hit" }
+                return Single.just(entry)
+            }
+            else -> return with(AtomicInteger()) {
+                logger.info { "Date $date not cached" }
+                circuitBreaker.rxExecuteCommandWithFallback<Apod>({ future ->
+                    if (this.getAndIncrement() > 0)
+                        logger.info { "number of retries: ${this.get() - 1}" }
+                    rxSendGet(date, nasaApiKey, id)
+                        .subscribeOn(Schedulers.io())
+                        .doOnSuccess {
+                            if (!apodCache.containsKey(date)) {
+                                apodCache.put(date, it)
+                                logger.info { "added entry to cache: ${it.id}" }
+                            }
+                        }.subscribe({ future.complete(it) }) { future.fail(it) }
+                }) {
+                    logger.error { "Circuit opened. Error: $it - message: ${it.message}" }
+                    emptyApod()
+                }
             }
         }
     }
@@ -155,6 +166,12 @@ class RemoteProxyServiceImpl(
             .expect(ResponsePredicate.JSON)
             .`as`(BodyCodec.jsonObject())
             .rxSend()
+            .map {
+                //logger.info { "acquire limiter" }
+                //limiter.acquire()
+                //logger.info { "acquired" }
+                it
+            }
             .map { it.body() }
             .map { asApod(apodId, it) }
 

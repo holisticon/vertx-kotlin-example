@@ -229,7 +229,6 @@ components:
       required:
         - id
         - title
-        - imageUriHd
       properties:
         id:
           description: The unique id of this apod
@@ -247,6 +246,7 @@ components:
           description: The uri of this image in hd resolution
           readOnly: true
           type: string
+          nullable: true
     RatingRequest:
       description: An Apod rating request payload
       required:
