@@ -12,8 +12,6 @@ const val CACHE_ALIAS = "apodCache"
 
 const val CIRCUIT_BREAKER_NAME = "apod-circuit-breaker"
 
-const val HEAP_POOL_SIZE = 1000L
-
 const val FIELD_TITLE = "title"
 const val FIELD_ID = "id"
 const val FIELD_RATING = "rating"

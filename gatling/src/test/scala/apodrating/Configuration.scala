@@ -20,7 +20,7 @@ object Configuration {
   // Test Load Config
   val usersPerSecond: Int = Properties.envOrElse("USERS_PER_SECOND", Properties.propOrElse("usersPerSecond", "2")).toInt
   val injectionTime: Int = Properties.envOrElse("INJECTION_TIME", Properties.propOrElse("injectionTime", "5")).toInt
-  val repeats: Int = Properties.envOrElse("TEST_REPEAT", Properties.propOrElse("testRepeat", "1")).toInt
+  val repeats: Int = Properties.envOrElse("TEST_REPEAT", Properties.propOrElse("testRepeat", "100")).toInt
 
   val authHeader: String = Properties.envOrElse("NASA_API_KEY", Properties.propOrElse("authHeader", "secret_header"))
   val simulationClass: String = Properties.envOrElse("SIMULATION_CLASS", Properties.propOrElse("simulationClass", "ApodSimulation"))

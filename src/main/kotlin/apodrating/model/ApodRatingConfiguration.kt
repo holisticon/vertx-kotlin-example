@@ -20,7 +20,8 @@ data class ApodRatingConfiguration(
     val jdbcPoolSize: Int = config.getInteger("JDBC_MAX_POOL_SIZE"),
     val nasaApiKey: String = config.getString("NASA_API_KEY"),
     val nasaApiHost: String = config.getString("NASA_API_HOST"),
-    val nasaApiPath: String = config.getString("NASA_API_PATH")
+    val nasaApiPath: String = config.getString("NASA_API_PATH"),
+    val cacheSize: Long = config.getLong("CACHE_POOL_SIZE_ENTRIES")
 
 ) {
 
