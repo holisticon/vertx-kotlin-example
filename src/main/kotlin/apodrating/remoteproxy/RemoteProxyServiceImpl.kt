@@ -12,8 +12,10 @@ import apodrating.model.emptyApod
 import apodrating.model.isEmpty
 import apodrating.model.toJsonObject
 import apodrating.webapi.handleFailure
+import io.reactivex.Completable
 import io.reactivex.Maybe
 import io.reactivex.Single
+import io.reactivex.rxkotlin.toCompletable
 import io.reactivex.schedulers.Schedulers
 import io.vertx.core.AsyncResult
 import io.vertx.core.Future
@@ -26,8 +28,6 @@ import io.vertx.reactivex.ext.web.client.WebClient
 import io.vertx.reactivex.ext.web.client.predicate.ResponsePredicate
 import io.vertx.reactivex.ext.web.codec.BodyCodec
 import io.vertx.serviceproxy.ServiceException
-import kotlinx.coroutines.async
-import kotlinx.coroutines.runBlocking
 import mu.KLogging
 import org.apache.http.HttpStatus
 import org.ehcache.Cache
@@ -52,50 +52,47 @@ class RemoteProxyServiceImpl(
     private lateinit var apodCache: Cache<String, Apod>
 
     init {
-        runBlocking {
-            val cacheRoutine = async {
-                CacheManagerBuilder.newCacheManagerBuilder()
-                    .withCache(
-                        CACHE_ALIAS,
-                        CacheConfigurationBuilder
-                            .newCacheConfigurationBuilder(
-                                String::class.java,
-                                Apod::class.java,
-                                ResourcePoolsBuilder.heap(apodConfig.cacheSize)
-                            ).withExpiry(ExpiryPolicyBuilder.noExpiration())
-                    ).build()
-                    .apply {
-                        this.init()
-                        apodCache = this.getCache(
-                            CACHE_ALIAS,
+        val cacheCompletable = {
+            CacheManagerBuilder.newCacheManagerBuilder()
+                .withCache(
+                    CACHE_ALIAS,
+                    CacheConfigurationBuilder
+                        .newCacheConfigurationBuilder(
                             String::class.java,
-                            Apod::class.java
-                        )
-                    }
-            }
-
-            val circuitbreakerRoutine = async {
-                circuitBreaker = CircuitBreaker.create(
-                    CIRCUIT_BREAKER_NAME, vertx,
-                    circuitBreakerOptionsOf(
-                        maxFailures = 3, // number of failures before opening the circuit
-                        timeout = 2000L, // consider a failure if the operation does not succeed in time
-                        fallbackOnFailure = true, // do we call the fallback on failure
-                        resetTimeout = 1000, // time spent in open state before attempting to re-try
-                        maxRetries = 3 // the number of times the circuit breaker tries to redo the
-                        // operation before failing
+                            Apod::class.java,
+                            ResourcePoolsBuilder.heap(apodConfig.cacheSize)
+                        ).withExpiry(ExpiryPolicyBuilder.noExpiration())
+                ).build()
+                .apply {
+                    this.init()
+                    apodCache = this.getCache(
+                        CACHE_ALIAS,
+                        String::class.java,
+                        Apod::class.java
                     )
+                }
+        }.toCompletable()
+            .subscribeOn(Schedulers.computation())
+
+        val circuitbreakerCompletable = {
+            circuitBreaker = CircuitBreaker.create(
+                CIRCUIT_BREAKER_NAME, vertx,
+                circuitBreakerOptionsOf(
+                    maxFailures = 3, // number of failures before opening the circuit
+                    timeout = 2000L, // consider a failure if the operation does not succeed in time
+                    fallbackOnFailure = true, // do we call the fallback on failure
+                    resetTimeout = 1000, // time spent in open state before attempting to re-try
+                    maxRetries = 3 // the number of times the circuit breaker tries to redo the
+                    // operation before failing
                 )
-            }
+            )
+        }.toCompletable().subscribeOn(Schedulers.io())
 
-            val webClientRoutine = async {
-                webClient = WebClient.create(vertx)
-            }
+        val webClientCompletable = {
+            webClient = WebClient.create(vertx)
+        }.toCompletable().subscribeOn(Schedulers.io())
 
-            cacheRoutine.await()
-            circuitbreakerRoutine.await()
-            webClientRoutine.await()
-        }
+        Completable.mergeArray(cacheCompletable, circuitbreakerCompletable, webClientCompletable).blockingAwait()
     }
 
     override fun performApodQuery(
