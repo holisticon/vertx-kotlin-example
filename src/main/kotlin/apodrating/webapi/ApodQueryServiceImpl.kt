@@ -10,7 +10,6 @@ import apodrating.model.isEmpty
 import apodrating.model.toJsonObject
 import apodrating.remoteproxy.createRemoteProxyServiceProxy
 import apodrating.remoteproxy.reactivex.RemoteProxyService
-import io.reactivex.BackpressureOverflowStrategy
 import io.reactivex.Maybe
 import io.reactivex.schedulers.Schedulers
 import io.vertx.core.AsyncResult
@@ -116,11 +115,6 @@ class ApodQueryServiceImpl(
             .map { it.rows.toList() }
             .filter { it.isEmpty().not() }
             .flattenAsFlowable { it }
-            .onBackpressureBuffer(
-                1,
-                { logger.info { "######## dropped item due to backpressue" } },
-                BackpressureOverflowStrategy.DROP_OLDEST
-            )
             .parallel()
             .runOn(Schedulers.io())
             .flatMap {
