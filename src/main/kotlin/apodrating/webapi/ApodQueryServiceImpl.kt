@@ -4,6 +4,7 @@ import apodrating.API_KEY_HEADER
 import apodrating.LOCATION_HEADER
 import apodrating.REMOTE_PROXY_SERVICE_ADDRESS
 import apodrating.model.ApodRatingConfiguration
+import apodrating.model.Title
 import apodrating.model.asApod
 import apodrating.model.asApodRequest
 import apodrating.model.isEmpty
@@ -44,6 +45,33 @@ class ApodQueryServiceImpl(
     companion object : KLogging()
 
     private val proxyService: RemoteProxyService = createRemoteProxyServiceProxy(vertx, REMOTE_PROXY_SERVICE_ADDRESS)
+
+    override fun getApodTitle(
+        apodId: String,
+        context: OperationRequest,
+        resultHandler: Handler<AsyncResult<OperationResponse>>
+    ) {
+        jdbc.rxQuerySingleWithParams("SELECT ID, DATE_STRING FROM APOD WHERE ID=?",
+            json { array(apodId) }
+        )
+            .flatMap {
+                proxyService.rxPerformApodQuery(
+                    it.getInteger(0).toString(),
+                    it.getString(1),
+                    context.headers.get(API_KEY_HEADER)
+                ).subscribeOn(Schedulers.io()).toMaybe()
+            }
+            .observeOn(Schedulers.computation())
+            .map {
+                succeed(
+                    HttpStatus.SC_OK,
+                    JsonObject.mapFrom(Title(asApod(it).title))
+                )
+            }
+            .switchIfEmpty(handleApodNotFound())
+            .subscribeOn(Schedulers.io())
+            .subscribe(resultHandler::handle) { handleFailure(resultHandler, it) }
+    }
 
     /**
      * Handle a GET request for a single APOD in our database.

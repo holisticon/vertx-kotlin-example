@@ -35,6 +35,12 @@ interface ApodQueryService {
         resultHandler: Handler<AsyncResult<OperationResponse>>
     )
 
+    fun getApodTitle(
+        apodId: String,
+        context: OperationRequest,
+        resultHandler: Handler<AsyncResult<OperationResponse>>
+    )
+
     /**
      * Handle a POST request for all APODs in our database.
      *

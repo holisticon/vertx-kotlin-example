@@ -124,6 +124,58 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /apod/{apodId}/title:
+    x-vertx-event-bus:
+      address: apod_query_service.apod
+      timeout: 2000
+    get:
+      summary: get the apod's title
+      operationId: getApodTitle
+      x-vertx-event-bus:
+        method: getApodTitle
+      security:
+        - ApiKeyAuth: []
+      tags:
+        - apodrating
+      parameters:
+        - name: apodId
+          in: path
+          required: true
+          description: the id of the apod
+          schema:
+            type: string
+            pattern: '^\d+$'
+      responses:
+        '200':
+          description: the requested apod title
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Title'
+        '400':
+          description: the last segement of the request path is not an integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: A rating for this Apod entry does not exist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Request could not be completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /apod/{apodId}/rating:
     x-vertx-event-bus:
       address: rating_service.apod
@@ -283,6 +335,15 @@ components:
           description: The title of this apod
           type: integer
           format: int32
+    Title:
+      title: plain text title of the apod
+      required:
+        - text
+      properties:
+        text:
+          description: the text
+          type: string
+          readOnly: true
     Error:
       required:
         - code
