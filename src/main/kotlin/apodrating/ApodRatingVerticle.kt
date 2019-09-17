@@ -53,36 +53,38 @@ class ApodRatingVerticle : CoroutineVerticle() {
         client = JDBCClient.createShared(rxVertx, apodConfig.toJdbcConfig())
         apiKey = apodConfig.nasaApiKey
 
-        val serviceBinderCpl = {
-            with(ServiceBinder(vertx)) {
-                this.setAddress(RATING_SERVICE_ADDRESS).register(
-                    RatingService::class.java,
-                    RatingServiceImpl(rxVertx, config)
-                )
-                this.setAddress(REMOTE_PROXY_SERVICE_ADDRESS)
-                    .register(RemoteProxyService::class.java, RemoteProxyServiceImpl(rxVertx, config))
-                this.setAddress(APOD_QUERY_ADDRESS).register(
-                    ApodQueryService::class.java,
-                    ApodQueryServiceImpl(rxVertx, config)
-                )
-            }
-        }.toCompletable()
-            .subscribe()
+        launch {
+            val serviceBinderCpl = {
+                with(ServiceBinder(vertx)) {
+                    this.setAddress(RATING_SERVICE_ADDRESS).register(
+                        RatingService::class.java,
+                        RatingServiceImpl(rxVertx, config)
+                    )
+                    this.setAddress(REMOTE_PROXY_SERVICE_ADDRESS)
+                        .register(RemoteProxyService::class.java, RemoteProxyServiceImpl(rxVertx, config))
+                    this.setAddress(APOD_QUERY_ADDRESS).register(
+                        ApodQueryService::class.java,
+                        ApodQueryServiceImpl(rxVertx, config)
+                    )
+                }
+            }.toCompletable()
+                .subscribe()
 
-        databaseObs()
-            .subscribe()
-        Single.zip(
-            http11Server(apodConfig),
-            http2Server(apodConfig),
-            BiFunction<HttpServer, HttpServer, Pair<Int, Int>> { s1, s2 ->
-                Pair(s1.actualPort(), s2.actualPort())
-            })
-            .subscribeOn(Schedulers.io())
-            .subscribe({ logger.info { "server listens on ports ${it.first} and ${it.second}" } }) {
-                startFuture?.fail("could not start http2 server.")
-            }
+            databaseObs()
+                .subscribe()
+            Single.zip(
+                http11Server(apodConfig),
+                http2Server(apodConfig),
+                BiFunction<HttpServer, HttpServer, Pair<Int, Int>> { s1, s2 ->
+                    Pair(s1.actualPort(), s2.actualPort())
+                })
+                .subscribeOn(Schedulers.io())
+                .subscribe({ logger.info { "server listens on ports ${it.first} and ${it.second}" } }) {
+                    startFuture?.fail("could not start http2 server.")
+                }
 
-        startFuture?.complete()
+            startFuture?.complete()
+        }
     }
 
     private fun http2Server(apodConfig: ApodRatingConfiguration): Single<HttpServer> = startHttpServer(
