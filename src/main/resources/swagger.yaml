@@ -4,7 +4,7 @@ info:
   title: apodrating
   description: "The apod rating app lets you rate NASA's Astronomy Picture of the Day and view ratings for them."
 servers:
-  - url: http://localhost:8081
+#  - url: http://localhost:8081
   - url: https://localhost:8443
 paths:
   /apod:
@@ -151,7 +151,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Title'
+                $ref: '#/components/schemas/TextObject'
         '400':
           description: the last segement of the request path is not an integer
           content:
@@ -335,8 +335,8 @@ components:
           description: The title of this apod
           type: integer
           format: int32
-    Title:
-      title: plain text title of the apod
+    TextObject:
+      description: plain text title of the apod
       required:
         - text
       properties:

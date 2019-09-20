@@ -4,7 +4,7 @@ import apodrating.API_KEY_HEADER
 import apodrating.LOCATION_HEADER
 import apodrating.REMOTE_PROXY_SERVICE_ADDRESS
 import apodrating.model.ApodRatingConfiguration
-import apodrating.model.Title
+import apodrating.model.TextObject
 import apodrating.model.asApod
 import apodrating.model.asApodRequest
 import apodrating.model.isEmpty
@@ -65,7 +65,7 @@ class ApodQueryServiceImpl(
             .map {
                 succeed(
                     HttpStatus.SC_OK,
-                    JsonObject.mapFrom(Title(asApod(it).title))
+                    JsonObject.mapFrom(TextObject(asApod(it).title))
                 )
             }
             .switchIfEmpty(handleApodNotFound())
