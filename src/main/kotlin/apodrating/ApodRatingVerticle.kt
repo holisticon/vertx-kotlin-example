@@ -66,7 +66,7 @@ class ApodRatingVerticle : CoroutineVerticle() {
                     ApodQueryServiceImpl(rxVertx, config)
                 )
             }
-        }.toCompletable().
+        }.toCompletable()
             .subscribe()
 
         Single.zip(
