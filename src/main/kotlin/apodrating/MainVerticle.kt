@@ -17,8 +17,10 @@ class MainVerticle : AbstractVerticle() {
      */
     override fun start() {
         with(System.currentTimeMillis()) {
-            vertx.rxDeployVerticle(verticleName, deploymentOptionsFromEnv(vertx))
-                .subscribe({ logger.info { "Startup time ${System.currentTimeMillis() - this}ms" } })
+            deploymentOptionsFromEnv(vertx)
+                .flatMap {
+                    vertx.rxDeployVerticle(verticleName, it)
+                }.subscribe({ logger.info { "Startup time ${System.currentTimeMillis() - this}ms" } })
                 { logger.error { it } }
         }
     }

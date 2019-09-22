@@ -10,7 +10,7 @@ import apodrating.webapi.ApodQueryServiceImpl
 import apodrating.webapi.RatingService
 import apodrating.webapi.RatingServiceImpl
 import io.reactivex.Single
-import io.reactivex.functions.Function3
+import io.reactivex.functions.Function4
 import io.reactivex.rxkotlin.toCompletable
 import io.reactivex.schedulers.Schedulers
 import io.vertx.core.Handler
@@ -67,13 +67,14 @@ class ApodRatingVerticle : CoroutineVerticle() {
                 )
             }
         }.toCompletable()
-            .subscribe()
+
 
         Single.zip(
+            serviceBinderCpl.toSingleDefault(true).onErrorReturn { false },
             databaseObs(),
             http11Server(apodConfig),
             http2Server(apodConfig),
-            Function3<Int, HttpServer, HttpServer, Pair<Int, Int>> { db, s1, s2 ->
+            Function4<Boolean, Int, HttpServer, HttpServer, Pair<Int, Int>> { service, db, s1, s2 ->
                 Pair(s1.actualPort(), s2.actualPort())
             })
             .subscribeOn(Schedulers.io())

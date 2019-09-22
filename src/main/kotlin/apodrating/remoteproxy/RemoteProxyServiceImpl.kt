@@ -123,7 +123,7 @@ class RemoteProxyServiceImpl(
 
     private fun getFromCacheOrRemoteApi(id: String, date: String, nasaApiKey: String): Single<Apod> =
         apodCache.get(date)?.let { Single.just(it) } ?: with(AtomicInteger()) {
-            circuitBreaker.rxExecuteCommandWithFallback<Apod>({ future ->
+            circuitBreaker.rxExecuteWithFallback<Apod>({ future ->
                 if (this.getAndIncrement() > 0)
                     logger.info { "number of retries: ${this.get() - 1}" }
                 rxSendGet(date, nasaApiKey, id)

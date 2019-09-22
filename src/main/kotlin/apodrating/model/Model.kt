@@ -8,6 +8,7 @@ import apodrating.FIELD_ID
 import apodrating.FIELD_NASA_API_KEY
 import apodrating.FIELD_RATING
 import apodrating.FIELD_TITLE
+import io.reactivex.Single
 import io.vertx.core.DeploymentOptions
 import io.vertx.core.json.JsonObject
 import io.vertx.ext.sql.ResultSet
@@ -105,10 +106,12 @@ fun Error.toJsonString(): String = this.toJsonObject().encode()
 /**
  * Get deployment options configured by environment variables.
  */
-fun deploymentOptionsFromEnv(vertx: Vertx): DeploymentOptions = configRetrieverOptionsOf(
-    scanPeriod = 2000,
-    stores = listOf(configStoreOptionsOf(type = "env"))
-).deploymentOptions(vertx)
+fun deploymentOptionsFromEnv(vertx: Vertx): Single<DeploymentOptions> {
+    return configRetrieverOptionsOf(
+        scanPeriod = 2000,
+        stores = listOf(configStoreOptionsOf(type = "env"))
+    ).deploymentOptions(vertx)
+}
 
 /**
  * Get a JsonObject for an apod query that is going to be sent over the eventbus.

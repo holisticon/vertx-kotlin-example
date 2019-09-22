@@ -1,5 +1,6 @@
 package apodrating.model
 
+import io.reactivex.Single
 import io.vertx.config.ConfigRetrieverOptions
 import io.vertx.core.DeploymentOptions
 import io.vertx.core.json.JsonObject
@@ -40,10 +41,13 @@ data class ApodRatingConfiguration(
 /**
  * Convert ConfigRetrieverOptions into DeploymentOptions
  */
-fun ConfigRetrieverOptions.deploymentOptions(vertx: Vertx): DeploymentOptions =
-    DeploymentOptions(
-        JsonObject().put(
-            "config",
-            ConfigRetriever.getConfigAsFuture(ConfigRetriever.create(vertx, this)).result()
-        )
-    )
+fun ConfigRetrieverOptions.deploymentOptions(vertx: Vertx): Single<DeploymentOptions> =
+    ConfigRetriever.create(vertx, this).rxGetConfig()
+        .map {
+            JsonObject().put("config", it)
+        }
+        .map {
+            DeploymentOptions(it)
+        }
+
+
