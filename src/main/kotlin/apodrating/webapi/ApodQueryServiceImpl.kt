@@ -76,7 +76,7 @@ class ApodQueryServiceImpl(
     /**
      * Handle a GET request for a single APOD in our database.
      */
-    override fun getApodForDate(
+    override fun getApodForId(
         apodId: String,
         context: OperationRequest,
         resultHandler: Handler<AsyncResult<OperationResponse>>
@@ -107,15 +107,13 @@ class ApodQueryServiceImpl(
         resultHandler: Handler<AsyncResult<OperationResponse>>
     ) {
         val apodRequest = asApodRequest(body)
-        val apiKeyHeader = context.headers[API_KEY_HEADER]
-        jdbc.rxUpdateWithParams("INSERT INTO APOD (DATE_STRING) VALUES ?",
-            json { array(apodRequest.dateString) })
+        jdbc.rxUpdateWithParams("INSERT INTO APOD (DATE_STRING) VALUES ?", json { array(apodRequest.dateString) })
             .map { it.keys.get<Int>(0) }
             .flatMap {
                 proxyService.rxPerformApodQuery(
                     it.toString(),
                     apodRequest.dateString,
-                    apiKeyHeader
+                    context.headers[API_KEY_HEADER]
                 ).subscribeOn(Schedulers.io())
             }
             .observeOn(Schedulers.computation())
@@ -139,12 +137,10 @@ class ApodQueryServiceImpl(
      */
     override fun getApods(context: OperationRequest, resultHandler: Handler<AsyncResult<OperationResponse>>) {
         jdbc.rxQuery("SELECT ID, DATE_STRING FROM APOD ")
-            .observeOn(Schedulers.computation())
             .map { it.rows.toList() }
             .filter { it.isEmpty().not() }
             .flattenAsFlowable { it }
             .parallel()
-            .runOn(Schedulers.io())
             .flatMap {
                 proxyService.rxPerformApodQuery(
                     it.getInteger("ID").toString(),
@@ -159,7 +155,6 @@ class ApodQueryServiceImpl(
             .toMaybe()
             .map { Future.succeededFuture(OperationResponse.completedWithJson(Json.array(it))) }
             .switchIfEmpty(Maybe.just(Future.succeededFuture(OperationResponse.completedWithJson(JsonArray()))))
-            .subscribeOn(Schedulers.io())
             .subscribe(resultHandler::handle) {
                 handleFailure(resultHandler, it, HttpStatus.SC_INTERNAL_SERVER_ERROR)
             }

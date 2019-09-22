@@ -18,11 +18,9 @@ paths:
         method: postApod
       security:
         - ApiKeyAuth: []
-      tags:
-        - apodrating
       requestBody:
         required: true
-        description: The rating you want to set
+        description: The apod you want to set
         content:
           application/json:
             schema:
@@ -54,8 +52,6 @@ paths:
         method: getApods
       security:
         - ApiKeyAuth: []
-      tags:
-        - apodrating
       responses:
         '200':
           description: An array of apods or an empty array, if no data is available.
@@ -65,6 +61,31 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Apod'
+              examples:
+                array-with-3-apods:
+                  value: {
+                           apods: [
+                           {
+                             "id": "1",
+                             "title": "Fresh Tiger Stripes on Saturn's Enceladus",
+                             "dateString": "2018-07-01",
+                             "imageUriHd": "https://apod.nasa.gov/apod/image/1807/enceladusstripes_cassini_3237.jpg"
+                           },
+                           {
+                             "id": "2",
+                             "title": "A Full Sky Aurora Over Norway",
+                             "dateString": "2017-01-01",
+                             "imageUriHd": "https://apod.nasa.gov/apod/image/1701/aurora_voltmer_1920.jpg"
+                           },
+                           {
+                             "id": "0",
+                             "title": "Vela Supernova Remnant Mosaic",
+                             "dateString": "2019-01-10",
+                             "imageUriHd": "https://apod.nasa.gov/apod/image/1901/Vela-DSS-New-L.jpg"
+                           }
+                           ]
+                  }
+
         '500':
           description: the request could not be completed
           content:
@@ -84,13 +105,11 @@ paths:
       timeout: 2000
     get:
       summary: get an apod for the specified date
-      operationId: getApodForDate
+      operationId: getApodForId
       x-vertx-event-bus:
-        method: getApodForDate
+        method: getApodForId
       security:
         - ApiKeyAuth: []
-      tags:
-        - apodrating
       parameters:
         - name: apodId
           in: path
@@ -106,6 +125,13 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Apod'
+              example:
+                value: {
+                  "id": "1",
+                  "title": "Fresh Tiger Stripes on Saturn's Enceladus",
+                  "dateString": "2018-07-01",
+                  "imageUriHd": "https://apod.nasa.gov/apod/image/1807/enceladusstripes_cassini_3237.jpg"
+                }
         '400':
           description: the last segement of the request path is not an integer
           content:
@@ -135,8 +161,6 @@ paths:
         method: getApodTitle
       security:
         - ApiKeyAuth: []
-      tags:
-        - apodrating
       parameters:
         - name: apodId
           in: path
@@ -185,8 +209,6 @@ paths:
       operationId: getRating
       x-vertx-event-bus:
         method: getRating
-      tags:
-        - apodrating
       parameters:
         - name: apodId
           in: path
@@ -231,8 +253,6 @@ paths:
       operationId: putRating
       x-vertx-event-bus:
         method: putRating
-      tags:
-        - apodrating
       parameters:
         - name: apodId
           in: path

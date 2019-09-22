@@ -20,7 +20,7 @@ interface ApodQueryService {
      * Handle a GET request for a single APOD in our database.
      *
      */
-    fun getApodForDate(
+    fun getApodForId(
         apodId: String,
         context: OperationRequest,
         resultHandler: Handler<AsyncResult<OperationResponse>>
