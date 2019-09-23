@@ -43,11 +43,7 @@ data class ApodRatingConfiguration(
  */
 fun ConfigRetrieverOptions.deploymentOptions(vertx: Vertx): Single<DeploymentOptions> =
     ConfigRetriever.create(vertx, this).rxGetConfig()
-        .map {
-            JsonObject().put("config", it)
-        }
-        .map {
-            DeploymentOptions(it)
-        }
+        .map { JsonObject().put("config", it) }
+        .map { DeploymentOptions(it) }
 
 
