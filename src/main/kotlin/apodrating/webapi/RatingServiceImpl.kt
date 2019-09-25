@@ -40,7 +40,7 @@ class RatingServiceImpl(
         apodId: String,
         context: OperationRequest,
         resultHandler: Handler<AsyncResult<OperationResponse>>
-    ) {
+    ): RatingService {
         jdbc.rxQuerySingleWithParams(
             "SELECT APOD_ID, AVG(VALUE) AS VALUE FROM RATING WHERE APOD_ID=? GROUP BY APOD_ID",
             JsonArray().add(apodId)
@@ -51,6 +51,7 @@ class RatingServiceImpl(
             .switchIfEmpty(handleApodNotFound())
             .subscribeOn(Schedulers.io())
             .subscribe(resultHandler::handle) { handleFailure(resultHandler, it) }
+        return this
     }
 
     /**
@@ -60,7 +61,7 @@ class RatingServiceImpl(
         apodId: String,
         context: OperationRequest,
         resultHandler: Handler<AsyncResult<OperationResponse>>
-    ) {
+    ): RatingService {
         jdbc.rxQuerySingleWithParams("SELECT ID FROM APOD WHERE ID=?",
             json { array(apodId) }
         ).map { it.getInteger(0) }
@@ -75,6 +76,7 @@ class RatingServiceImpl(
             .switchIfEmpty(handleApodNotFound())
             .subscribeOn(Schedulers.io())
             .subscribe(resultHandler::handle) { handleFailure(resultHandler, it) }
+        return this
     }
 
     /**

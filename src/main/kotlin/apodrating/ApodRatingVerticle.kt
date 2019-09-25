@@ -6,7 +6,7 @@ import apodrating.model.toJsonString
 import apodrating.remoteproxy.RemoteProxyService
 import apodrating.remoteproxy.RemoteProxyServiceImpl
 import apodrating.webapi.ApodQueryService
-import apodrating.webapi.ApodQueryServiceImpl
+import apodrating.webapi.ApodQueryServiceFactory
 import apodrating.webapi.RatingService
 import apodrating.webapi.RatingServiceImpl
 import io.reactivex.Single
@@ -63,7 +63,7 @@ class ApodRatingVerticle : CoroutineVerticle() {
                     .register(RemoteProxyService::class.java, RemoteProxyServiceImpl(rxVertx, config))
                 this.setAddress(APOD_QUERY_ADDRESS).register(
                     ApodQueryService::class.java,
-                    ApodQueryServiceImpl(rxVertx, config)
+                    ApodQueryServiceFactory.create(vertx, config)
                 )
             }
         }.toCompletable()

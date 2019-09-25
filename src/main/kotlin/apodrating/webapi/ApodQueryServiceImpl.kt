@@ -9,7 +9,7 @@ import apodrating.model.asApod
 import apodrating.model.asApodRequest
 import apodrating.model.isEmpty
 import apodrating.model.toJsonObject
-import apodrating.remoteproxy.createRemoteProxyServiceProxy
+import apodrating.remoteproxy.RemoteProxyServiceFactory
 import apodrating.remoteproxy.reactivex.RemoteProxyService
 import io.reactivex.Maybe
 import io.reactivex.schedulers.Schedulers
@@ -44,17 +44,19 @@ class ApodQueryServiceImpl(
 
     companion object : KLogging()
 
-    private val proxyService: RemoteProxyService = createRemoteProxyServiceProxy(vertx, REMOTE_PROXY_SERVICE_ADDRESS)
+    private val proxyService: RemoteProxyService =
+        RemoteProxyServiceFactory.createProxy(vertx.delegate, REMOTE_PROXY_SERVICE_ADDRESS)
 
     override fun getApodTitle(
         apodId: String,
         context: OperationRequest,
         resultHandler: Handler<AsyncResult<OperationResponse>>
-    ) {
+    ): ApodQueryService {
         jdbc.rxQuerySingleWithParams("SELECT ID, DATE_STRING FROM APOD WHERE ID=?",
             json { array(apodId) }
         )
             .flatMap {
+
                 proxyService.rxPerformApodQuery(
                     it.getInteger(0).toString(),
                     it.getString(1),
@@ -71,6 +73,7 @@ class ApodQueryServiceImpl(
             .switchIfEmpty(handleApodNotFound())
             .subscribeOn(Schedulers.io())
             .subscribe(resultHandler::handle) { handleFailure(resultHandler, it) }
+        return this
     }
 
     /**
@@ -80,7 +83,7 @@ class ApodQueryServiceImpl(
         apodId: String,
         context: OperationRequest,
         resultHandler: Handler<AsyncResult<OperationResponse>>
-    ) {
+    ): ApodQueryService {
         jdbc.rxQuerySingleWithParams("SELECT ID, DATE_STRING FROM APOD WHERE ID=?",
             json { array(apodId) }
         )
@@ -96,6 +99,7 @@ class ApodQueryServiceImpl(
             .switchIfEmpty(handleApodNotFound())
             .subscribeOn(Schedulers.io())
             .subscribe(resultHandler::handle) { handleFailure(resultHandler, it) }
+        return this
     }
 
     /**
@@ -105,7 +109,7 @@ class ApodQueryServiceImpl(
         body: JsonObject,
         context: OperationRequest,
         resultHandler: Handler<AsyncResult<OperationResponse>>
-    ) {
+    ): ApodQueryService {
         val apodRequest = asApodRequest(body)
         jdbc.rxUpdateWithParams("INSERT INTO APOD (DATE_STRING) VALUES ?", json { array(apodRequest.dateString) })
             .map { it.keys.get<Int>(0) }
@@ -129,13 +133,17 @@ class ApodQueryServiceImpl(
             .subscribe(resultHandler::handle) {
                 handleFailure(resultHandler, it, HttpStatus.SC_INTERNAL_SERVER_ERROR)
             }
+        return this
     }
 
     /**
      * Handle a GET request for all APODs in our database.
      *
      */
-    override fun getApods(context: OperationRequest, resultHandler: Handler<AsyncResult<OperationResponse>>) {
+    override fun getApods(
+        context: OperationRequest,
+        resultHandler: Handler<AsyncResult<OperationResponse>>
+    ): ApodQueryService {
         jdbc.rxQuery("SELECT ID, DATE_STRING FROM APOD ")
             .map { it.rows.toList() }
             .filter { it.isEmpty().not() }
@@ -158,6 +166,7 @@ class ApodQueryServiceImpl(
             .subscribe(resultHandler::handle) {
                 handleFailure(resultHandler, it, HttpStatus.SC_INTERNAL_SERVER_ERROR)
             }
+        return this
     }
 
     /**
