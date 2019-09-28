@@ -13,10 +13,10 @@ fi
 if [[ "$_java" ]]; then
     version=$("$_java" -version 2>&1 | awk -F '"' '/version/ {print $2}')
     echo version "$version"
-    if [[ "$version" > "11" ]]; then
-        echo Java version is greater than or equal to 11.
+    if [[ "$version" -ge "$JAVA_VERSION" ]]; then
+        printf "Java version is greater than or equal to $JAVA_VERSION.\n"
     else
-        echo Java version is older than 11. Please upgrade.
+        printf "Java version is older than $JAVA_VERSION. Please upgrade.\n"
         exit 1
     fi
 fi

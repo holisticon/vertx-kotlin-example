@@ -11,7 +11,13 @@ import apodrating.model.asApod
 import apodrating.model.emptyApod
 import apodrating.model.isEmpty
 import apodrating.model.toJsonObject
+import apodrating.model.toJsonString
 import apodrating.webapi.handleFailure
+import com.hazelcast.cache.ICache
+import com.hazelcast.config.CacheSimpleConfig
+import com.hazelcast.core.Hazelcast
+import com.hazelcast.core.HazelcastInstance
+import com.hazelcast.core.ICacheManager
 import io.reactivex.Completable
 import io.reactivex.Maybe
 import io.reactivex.Single
@@ -20,6 +26,7 @@ import io.reactivex.schedulers.Schedulers
 import io.vertx.core.AsyncResult
 import io.vertx.core.Future
 import io.vertx.core.Handler
+import io.vertx.core.VertxOptions
 import io.vertx.core.json.JsonObject
 import io.vertx.kotlin.circuitbreaker.circuitBreakerOptionsOf
 import io.vertx.reactivex.circuitbreaker.CircuitBreaker
@@ -28,13 +35,11 @@ import io.vertx.reactivex.ext.web.client.WebClient
 import io.vertx.reactivex.ext.web.client.predicate.ResponsePredicate
 import io.vertx.reactivex.ext.web.codec.BodyCodec
 import io.vertx.serviceproxy.ServiceException
+import io.vertx.spi.cluster.hazelcast.ConfigUtil
+import io.vertx.spi.cluster.hazelcast.HazelcastClusterManager
 import mu.KLogging
 import org.apache.http.HttpStatus
-import org.ehcache.Cache
-import org.ehcache.config.builders.CacheConfigurationBuilder
-import org.ehcache.config.builders.CacheManagerBuilder
-import org.ehcache.config.builders.ExpiryPolicyBuilder
-import org.ehcache.config.builders.ResourcePoolsBuilder
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -49,30 +54,37 @@ class RemoteProxyServiceImpl(
 
     private lateinit var circuitBreaker: CircuitBreaker
     private lateinit var webClient: WebClient
-    private lateinit var apodCache: Cache<String, Apod>
+    private lateinit var cache: ICache<String, String>
 
     init {
-        val cacheCompletable = {
-            CacheManagerBuilder.newCacheManagerBuilder()
-                .withCache(
-                    CACHE_ALIAS,
-                    CacheConfigurationBuilder
-                        .newCacheConfigurationBuilder(
-                            String::class.java,
-                            Apod::class.java,
-                            ResourcePoolsBuilder.heap(apodConfig.cacheSize)
-                        ).withExpiry(ExpiryPolicyBuilder.noExpiration())
-                ).build()
-                .apply {
-                    this.init()
-                    apodCache = this.getCache(
-                        CACHE_ALIAS,
-                        String::class.java,
-                        Apod::class.java
+        val hazelcastConf = {
+            val hazelcastConfig = ConfigUtil.loadConfig()
+
+            val cacheConfig: CacheSimpleConfig = CacheSimpleConfig();
+            cacheConfig.setName(CACHE_ALIAS);
+            cacheConfig.setExpiryPolicyFactoryConfig(
+                CacheSimpleConfig.ExpiryPolicyFactoryConfig(
+                    CacheSimpleConfig.ExpiryPolicyFactoryConfig.TimedExpiryPolicyFactoryConfig(
+                        CacheSimpleConfig
+                            .ExpiryPolicyFactoryConfig.TimedExpiryPolicyFactoryConfig.ExpiryPolicyType.CREATED,
+                        CacheSimpleConfig.ExpiryPolicyFactoryConfig.DurationConfig(
+                            60,
+                            TimeUnit.MINUTES
+                        )
                     )
+                )
+            )
+            hazelcastConfig.addCacheConfig(cacheConfig)
+            val hz: HazelcastInstance = Hazelcast.newHazelcastInstance(hazelcastConfig)
+            val cacheManager: ICacheManager = hz.getCacheManager()
+            val mgr = HazelcastClusterManager(hazelcastConfig)
+            cache = cacheManager.getCache(CACHE_ALIAS)
+            val options = VertxOptions().setClusterManager(mgr)
+            Vertx.rxClusteredVertx(options)
+                .subscribe { onSuccess: Vertx?, onError: Throwable? ->
+                    logger.info { "##.#####" + onSuccess.toString() }
                 }
-        }.toCompletable()
-            .subscribeOn(Schedulers.computation())
+        }.toCompletable().subscribeOn(Schedulers.io())
 
         val circuitbreakerCompletable = {
             circuitBreaker = CircuitBreaker.create(
@@ -91,8 +103,8 @@ class RemoteProxyServiceImpl(
         val webClientCompletable = {
             webClient = WebClient.create(vertx)
         }.toCompletable().subscribeOn(Schedulers.io())
-
-        Completable.mergeArray(cacheCompletable, circuitbreakerCompletable, webClientCompletable).blockingAwait()
+        Completable.mergeArray(circuitbreakerCompletable, webClientCompletable, hazelcastConf)
+            .blockingAwait()
     }
 
     override fun performApodQuery(
@@ -121,23 +133,26 @@ class RemoteProxyServiceImpl(
         return this
     }
 
-    private fun getFromCacheOrRemoteApi(id: String, date: String, nasaApiKey: String): Single<Apod> =
-        apodCache.get(date)?.let { Single.just(it) } ?: with(AtomicInteger()) {
+    private fun getFromCacheOrRemoteApi(id: String, date: String, nasaApiKey: String): Single<Apod> {
+        return cache.get(date)?.let { Single.just(asApod(JsonObject(it))) } ?: with(AtomicInteger()) {
             circuitBreaker.rxExecuteWithFallback<Apod>({ future ->
                 if (this.getAndIncrement() > 0)
                     logger.info { "number of retries: ${this.get() - 1}" }
                 rxSendGet(date, nasaApiKey, id)
                     .subscribeOn(Schedulers.io())
                     .doOnSuccess {
-                        if (!apodCache.containsKey(date)) {
-                            apodCache.put(date, it)
+                        if (!cache.containsKey(date)) {
+                            cache.put(date, it.toJsonString())
                         }
-                    }.subscribe({ future.complete(it) }) { future.fail(it) }
+                    }.subscribe({
+                        future.complete(it)
+                    }) { future.fail(it) }
             }) {
                 logger.error { "Circuit opened. Error: $it - message: ${it.message}" }
                 emptyApod()
             }
         }
+    }
 
     private fun rxSendGet(date: String, nasaApiKey: String, apodId: String): Single<Apod> =
         webClient.getAbs(apodConfig.nasaApiHost)
@@ -149,12 +164,6 @@ class RemoteProxyServiceImpl(
             .expect(ResponsePredicate.JSON)
             .`as`(BodyCodec.jsonObject())
             .rxSend()
-            .map {
-                //logger.info { "acquire limiter" }
-                //limiter.acquire()
-                //logger.info { "acquired" }
-                it
-            }
             .map { it.body() }
             .map { asApod(apodId, it) }
 
@@ -164,6 +173,6 @@ class RemoteProxyServiceImpl(
     override fun close() {
         webClient.close()
         circuitBreaker.close()
-        apodCache.clear()
+        cache.clear()
     }
 }

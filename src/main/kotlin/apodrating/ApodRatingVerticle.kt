@@ -4,11 +4,12 @@ import apodrating.model.ApodRatingConfiguration
 import apodrating.model.Error
 import apodrating.model.toJsonString
 import apodrating.remoteproxy.RemoteProxyService
-import apodrating.remoteproxy.RemoteProxyServiceImpl
+import apodrating.remoteproxy.RemoteProxyServiceFactory
 import apodrating.webapi.ApodQueryService
 import apodrating.webapi.ApodQueryServiceFactory
 import apodrating.webapi.RatingService
-import apodrating.webapi.RatingServiceImpl
+import apodrating.webapi.RatingServiceFactory
+import io.reactivex.Completable
 import io.reactivex.Single
 import io.reactivex.functions.Function4
 import io.reactivex.rxkotlin.toCompletable
@@ -16,6 +17,7 @@ import io.reactivex.schedulers.Schedulers
 import io.vertx.core.Handler
 import io.vertx.core.Promise
 import io.vertx.core.http.HttpServerOptions
+import io.vertx.core.json.JsonObject
 import io.vertx.kotlin.core.net.pemKeyCertOptionsOf
 import io.vertx.kotlin.coroutines.CoroutineVerticle
 import io.vertx.reactivex.core.Vertx
@@ -53,24 +55,8 @@ class ApodRatingVerticle : CoroutineVerticle() {
         client = JDBCClient.createShared(rxVertx, apodConfig.toJdbcConfig())
         apiKey = apodConfig.nasaApiKey
 
-        val serviceBinderCpl = {
-            with(ServiceBinder(vertx)) {
-                this.setAddress(RATING_SERVICE_ADDRESS).register(
-                    RatingService::class.java,
-                    RatingServiceImpl(rxVertx, config)
-                )
-                this.setAddress(REMOTE_PROXY_SERVICE_ADDRESS)
-                    .register(RemoteProxyService::class.java, RemoteProxyServiceImpl(rxVertx, config))
-                this.setAddress(APOD_QUERY_ADDRESS).register(
-                    ApodQueryService::class.java,
-                    ApodQueryServiceFactory.create(vertx, config)
-                )
-            }
-        }.toCompletable()
-
-
         Single.zip(
-            serviceBinderCpl.toSingleDefault(true).onErrorReturn { false },
+            serviceBinderCompletable(rxVertx, config).toSingleDefault(true).onErrorReturn { false },
             databaseObs(),
             http11Server(apodConfig),
             http2Server(apodConfig),
@@ -82,9 +68,27 @@ class ApodRatingVerticle : CoroutineVerticle() {
                 logger.info { "server listens on ports ${it.first} and ${it.second}" }
                 startFuture?.complete()
             }) {
-                startFuture?.fail("could not start http2 server.")
+                startFuture?.fail("could not start http2 server. ${it.message} ")
             }
     }
+
+    private fun serviceBinderCompletable(vertx: Vertx, config: JsonObject): Completable = {
+        with(ServiceBinder(vertx.delegate)) {
+            setAddress(RATING_SERVICE_ADDRESS).register(
+                RatingService::class.java,
+                RatingServiceFactory.create(vertx.delegate, config)
+            )
+            setAddress(REMOTE_PROXY_SERVICE_ADDRESS)
+                .register(
+                    RemoteProxyService::class.java,
+                    RemoteProxyServiceFactory.create(vertx.delegate, config)
+                )
+            setAddress(APOD_QUERY_ADDRESS).register(
+                ApodQueryService::class.java,
+                ApodQueryServiceFactory.create(vertx.delegate, config)
+            )
+        }
+    }.toCompletable()
 
     private fun http2Server(apodConfig: ApodRatingConfiguration): Single<HttpServer> = startHttpServer(
         apodConfig.h2Port,
