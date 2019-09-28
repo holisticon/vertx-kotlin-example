@@ -22,7 +22,8 @@ ENV CACHE_POOL_SIZE_ENTRIES=${CACHE_POOL_SIZE_ENTRIES_ARG}
 COPY target/dependency-jars /run/dependency-jars
 COPY target/application.jar /run/application.jar
 
-EXPOSE ${APODRATING_PORT_ARG}
-EXPOSE ${APODRATING_H2_PORT_ARG}
+EXPOSE 8081
+EXPOSE 8443
+EXPOSE 5701
 
 ENTRYPOINT ["java", "-jar", "run/application.jar", "-D", "exec.mainClass=\"apodrating.MainKt\""]
