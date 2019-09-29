@@ -26,6 +26,8 @@ EXPOSE 8443
 EXPOSE 5701
 
 USER 10001
+COPY target/dependency-jars /run/dependency-jars
+COPY target/application.jar /run/application.jar
 
 
 ENTRYPOINT ["java", "-jar", "run/application.jar", "-D", "exec.mainClass=\"apodrating.MainKt\""]
