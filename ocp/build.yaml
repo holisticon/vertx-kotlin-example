@@ -1,0 +1,46 @@
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  annotations:
+    openshift.io/generated-by: OpenShiftNewApp
+  labels:
+    app: vertx-kotlin-example
+  name: vertx-kotlin-example
+  namespace: myproject
+spec:
+  failedBuildsHistoryLimit: 5
+  nodeSelector: null
+  output:
+    to:
+      kind: ImageStreamTag
+      name: 'vertx-kotlin-example:latest'
+  postCommit: {}
+  resources: {}
+  runPolicy: SerialLatestOnly
+  source:
+    git:
+      ref: feature/vertx4
+      uri: 'https://github.com/holisticon/vertx-kotlin-example.git'
+    type: Git
+  strategy:
+    sourceStrategy:
+      from:
+        kind: ImageStreamTag
+        name: 'kotlin-example:latest'
+        namespace: myproject
+    type: Source
+  successfulBuildsHistoryLimit: 5
+  triggers:
+    - github:
+        secret: p4wP3jFhVYkhCAFp43bU
+      type: GitHub
+    - generic:
+        secret: gnTWcZd_6wkv0WMlDf0t
+      type: Generic
+    - type: ConfigChange
+    - imageChange:
+        lastTriggeredImageID: >-
+          weinschenker/kotlin-example@sha256:5ecb2bdb2975531acfd55e43143c3e62285a32ee53a7567df5a88c784e6ad0ba
+      type: ImageChange
+status:
+  lastVersion: 2

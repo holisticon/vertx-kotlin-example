@@ -455,7 +455,7 @@
                         <manifest>
                             <addClasspath>true</addClasspath>
                             <mainClass>apodrating.MainKt</mainClass>
-                            <classpathPrefix>dependency-jars/</classpathPrefix>
+<!--                            <classpathPrefix>dependency-jars/</classpathPrefix>-->
                         </manifest>
                     </archive>
                 </configuration>
@@ -472,7 +472,7 @@
                         </goals>
                         <configuration>
                             <outputDirectory>
-                                ${project.build.directory}/dependency-jars/
+                                ${project.build.directory}
                             </outputDirectory>
                         </configuration>
                     </execution>
