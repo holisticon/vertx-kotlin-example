@@ -1,5 +1,5 @@
 language: java
-jdk: openjdk12
+jdk: openjdk11
 
 install:
   - mvn test-compile -DskipTests=true -Dmaven.javadoc.skip=true -B -V -P codacycoverage
