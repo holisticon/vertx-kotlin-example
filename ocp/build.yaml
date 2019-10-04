@@ -1,22 +1,50 @@
 apiVersion: build.openshift.io/v1
-kind: BuildConfig
+kind: Build
 metadata:
   annotations:
-    openshift.io/generated-by: OpenShiftNewApp
+    openshift.io/build-config.name: vertx-kotlin-example
+    openshift.io/build.number: '7'
+    openshift.io/build.pod-name: vertx-kotlin-example-7-build
+  creationTimestamp: '2019-09-29T05:11:54Z'
   labels:
     app: vertx-kotlin-example
-  name: vertx-kotlin-example
+    buildconfig: vertx-kotlin-example
+    openshift.io/build-config.name: vertx-kotlin-example
+    openshift.io/build.start-policy: SerialLatestOnly
+  name: vertx-kotlin-example-7
   namespace: myproject
+  ownerReferences:
+    - apiVersion: build.openshift.io/v1
+      controller: true
+      kind: BuildConfig
+      name: vertx-kotlin-example
+      uid: a39b91d6-e26a-11e9-b97b-6695df3a801c
+  resourceVersion: '159595'
+  selfLink: >-
+    /apis/build.openshift.io/v1/namespaces/myproject/builds/vertx-kotlin-example-7
+  uid: a736b5cf-e277-11e9-b97b-6695df3a801c
 spec:
-  failedBuildsHistoryLimit: 5
   nodeSelector: null
   output:
+    pushSecret:
+      name: builder-dockercfg-89fs5
     to:
       kind: ImageStreamTag
       name: 'vertx-kotlin-example:latest'
   postCommit: {}
   resources: {}
-  runPolicy: SerialLatestOnly
+  revision:
+    git:
+      author:
+        email: jan.weinschenker@holisticon.de
+        name: Jan Weinschenker
+      commit: 4cb41171f176008c9c222e48befb5d7de6517f16
+      committer:
+        email: jan.weinschenker@holisticon.de
+        name: Jan Weinschenker
+      message: 'fix: put dependency-jars directly into target'
+    type: Git
+  serviceAccount: builder
   source:
     git:
       ref: feature/vertx4
@@ -24,23 +52,68 @@ spec:
     type: Git
   strategy:
     sourceStrategy:
+      env:
+        - name: JAVA_LIB_DIR
+          value: target
+        - name: JAVA_APP_JAR
+          value: application.jar
+        - name: JAVA_MAIN_CLASS
+          value: apodrating.MainKt
+        - name: JAVA_OPTIONS
+          value: >-
+            --add-modules java.se --add-exports
+            java.base/jdk.internal.ref=ALL-UNNAMED --add-opens
+            java.base/java.lang=ALL-UNNAMED --add-opens
+            java.base/java.nio=ALL-UNNAMED --add-opens
+            java.base/sun.nio.ch=ALL-UNNAMED --add-opens
+            java.management/sun.management=ALL-UNNAMED --add-opens
+            jdk.management/com.sun.management.internal=ALL-UNNAMED
       from:
-        kind: ImageStreamTag
-        name: 'kotlin-example:latest'
-        namespace: myproject
-    type: Source
-  successfulBuildsHistoryLimit: 5
-  triggers:
-    - github:
-        secret: p4wP3jFhVYkhCAFp43bU
-      type: GitHub
-    - generic:
-        secret: gnTWcZd_6wkv0WMlDf0t
-      type: Generic
-    - type: ConfigChange
-    - imageChange:
-        lastTriggeredImageID: >-
+        kind: DockerImage
+        name: >-
           weinschenker/kotlin-example@sha256:5ecb2bdb2975531acfd55e43143c3e62285a32ee53a7567df5a88c784e6ad0ba
-      type: ImageChange
+    type: Source
+  triggeredBy:
+    - message: Manually triggered
 status:
-  lastVersion: 2
+  completionTimestamp: '2019-09-29T05:14:12Z'
+  config:
+    kind: BuildConfig
+    name: vertx-kotlin-example
+    namespace: myproject
+  duration: 138000000000
+  output:
+    to:
+      imageDigest: 'sha256:9501dbe19b6cd95a4f432e049db07d2b9a4c06f712e7b2d01c744914ca6182d9'
+  outputDockerImageReference: '172.30.1.1:5000/myproject/vertx-kotlin-example:latest'
+  phase: Complete
+  stages:
+    - durationMilliseconds: 1840
+      name: FetchInputs
+      startTime: '2019-09-29T05:11:56Z'
+      steps:
+        - durationMilliseconds: 1840
+          name: FetchGitSource
+          startTime: '2019-09-29T05:11:56Z'
+    - durationMilliseconds: 4657
+      name: CommitContainer
+      startTime: '2019-09-29T05:13:53Z'
+      steps:
+        - durationMilliseconds: 4657
+          name: CommitContainer
+          startTime: '2019-09-29T05:13:53Z'
+    - durationMilliseconds: 116554
+      name: Assemble
+      startTime: '2019-09-29T05:12:01Z'
+      steps:
+        - durationMilliseconds: 116554
+          name: AssembleBuildScripts
+          startTime: '2019-09-29T05:12:01Z'
+    - durationMilliseconds: 14088
+      name: PushImage
+      startTime: '2019-09-29T05:13:58Z'
+      steps:
+        - durationMilliseconds: 14088
+          name: PushImage
+          startTime: '2019-09-29T05:13:58Z'
+  startTimestamp: '2019-09-29T05:11:54Z'

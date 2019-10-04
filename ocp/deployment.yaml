@@ -1,0 +1,124 @@
+apiVersion: apps.openshift.io/v1
+kind: DeploymentConfig
+metadata:
+  annotations:
+    openshift.io/generated-by: OpenShiftNewApp
+  creationTimestamp: '2019-09-29T03:38:45Z'
+  generation: 8
+  labels:
+    app: vertx-kotlin-example
+  name: vertx-kotlin-example
+  namespace: myproject
+  resourceVersion: '159666'
+  selfLink: >-
+    /apis/apps.openshift.io/v1/namespaces/myproject/deploymentconfigs/vertx-kotlin-example
+  uid: a39eebeb-e26a-11e9-b97b-6695df3a801c
+spec:
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    app: vertx-kotlin-example
+    deploymentconfig: vertx-kotlin-example
+  strategy:
+    activeDeadlineSeconds: 21600
+    resources: {}
+    rollingParams:
+      intervalSeconds: 1
+      maxSurge: 25%
+      maxUnavailable: 25%
+      timeoutSeconds: 600
+      updatePeriodSeconds: 1
+    type: Rolling
+  template:
+    metadata:
+      annotations:
+        openshift.io/generated-by: OpenShiftNewApp
+      creationTimestamp: null
+      labels:
+        app: vertx-kotlin-example
+        deploymentconfig: vertx-kotlin-example
+    spec:
+      containers:
+        - env:
+            - name: APODRATING_PORT
+              value: '8081'
+            - name: APODRATING_H2_PORT
+              value: '8443'
+            - name: JDBC_URL
+              value: 'jdbc:hsqldb:mem:test?shutdown=true'
+            - name: JDBC_DRIVER
+              value: org.hsqldb.jdbcDriver
+            - name: JDBC_MAX_POOL_SIZE
+              value: '30'
+            - name: NASA_API_KEY
+              value: toSgQoGTapxfoNs40DFk9Z2Z7YfgcuYNcZtZuT1S
+            - name: NASA_API_HOST
+              value: 'https://api.nasa.gov'
+            - name: NASA_API_PATH
+              value: /planetary/apod
+            - name: CACHE_POOL_SIZE_ENTRIES
+              value: '100'
+            - name: JAVA_VERSION
+              value: '12'
+          image: >-
+            172.30.1.1:5000/myproject/vertx-kotlin-example@sha256:9501dbe19b6cd95a4f432e049db07d2b9a4c06f712e7b2d01c744914ca6182d9
+          imagePullPolicy: Always
+          name: vertx-kotlin-example
+          ports:
+            - containerPort: 8081
+              protocol: TCP
+            - containerPort: 8443
+              protocol: TCP
+            - containerPort: 5701
+              protocol: TCP
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+  test: false
+  triggers:
+    - type: ConfigChange
+    - imageChangeParams:
+        automatic: true
+        containerNames:
+          - vertx-kotlin-example
+        from:
+          kind: ImageStreamTag
+          name: 'vertx-kotlin-example:latest'
+          namespace: myproject
+        lastTriggeredImage: >-
+          172.30.1.1:5000/myproject/vertx-kotlin-example@sha256:9501dbe19b6cd95a4f432e049db07d2b9a4c06f712e7b2d01c744914ca6182d9
+      type: ImageChange
+status:
+  availableReplicas: 1
+  conditions:
+    - lastTransitionTime: '2019-09-29T05:00:28Z'
+      lastUpdateTime: '2019-09-29T05:00:28Z'
+      message: Deployment config has minimum availability.
+      status: 'True'
+      type: Available
+    - lastTransitionTime: '2019-09-29T05:14:17Z'
+      lastUpdateTime: '2019-09-29T05:14:20Z'
+      message: replication controller "vertx-kotlin-example-7" successfully rolled out
+      reason: NewReplicationControllerAvailable
+      status: 'True'
+      type: Progressing
+  details:
+    causes:
+      - imageTrigger:
+          from:
+            kind: DockerImage
+            name: >-
+              172.30.1.1:5000/myproject/vertx-kotlin-example@sha256:9501dbe19b6cd95a4f432e049db07d2b9a4c06f712e7b2d01c744914ca6182d9
+        type: ImageChange
+    message: image change
+  latestVersion: 7
+  observedGeneration: 8
+  readyReplicas: 1
+  replicas: 1
+  unavailableReplicas: 0
+  updatedReplicas: 1

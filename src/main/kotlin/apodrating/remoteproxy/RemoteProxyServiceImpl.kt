@@ -11,7 +11,6 @@ import apodrating.model.asApod
 import apodrating.model.emptyApod
 import apodrating.model.isEmpty
 import apodrating.model.toJsonObject
-import apodrating.model.toJsonString
 import apodrating.webapi.handleFailure
 import com.hazelcast.cache.ICache
 import com.hazelcast.config.CacheSimpleConfig
@@ -54,35 +53,33 @@ class RemoteProxyServiceImpl(
 
     private lateinit var circuitBreaker: CircuitBreaker
     private lateinit var webClient: WebClient
-    private lateinit var cache: ICache<String, String>
+    private lateinit var cache: ICache<String, Apod>
 
     init {
         val hazelcastConf = {
             val hazelcastConfig = ConfigUtil.loadConfig()
-
-            val cacheConfig: CacheSimpleConfig = CacheSimpleConfig();
-            cacheConfig.setName(CACHE_ALIAS);
-            cacheConfig.setExpiryPolicyFactoryConfig(
-                CacheSimpleConfig.ExpiryPolicyFactoryConfig(
-                    CacheSimpleConfig.ExpiryPolicyFactoryConfig.TimedExpiryPolicyFactoryConfig(
-                        CacheSimpleConfig
-                            .ExpiryPolicyFactoryConfig.TimedExpiryPolicyFactoryConfig.ExpiryPolicyType.CREATED,
-                        CacheSimpleConfig.ExpiryPolicyFactoryConfig.DurationConfig(
-                            60,
-                            TimeUnit.MINUTES
-                        )
+            val cacheConfig = CacheSimpleConfig()
+            cacheConfig.name = CACHE_ALIAS
+            cacheConfig.expiryPolicyFactoryConfig = CacheSimpleConfig.ExpiryPolicyFactoryConfig(
+                CacheSimpleConfig.ExpiryPolicyFactoryConfig.TimedExpiryPolicyFactoryConfig(
+                    CacheSimpleConfig
+                        .ExpiryPolicyFactoryConfig.TimedExpiryPolicyFactoryConfig.ExpiryPolicyType.CREATED,
+                    CacheSimpleConfig.ExpiryPolicyFactoryConfig.DurationConfig(
+                        60,
+                        TimeUnit.MINUTES
                     )
                 )
             )
             hazelcastConfig.addCacheConfig(cacheConfig)
             val hz: HazelcastInstance = Hazelcast.newHazelcastInstance(hazelcastConfig)
-            val cacheManager: ICacheManager = hz.getCacheManager()
+            val cacheManager: ICacheManager = hz.cacheManager
             val mgr = HazelcastClusterManager(hazelcastConfig)
             cache = cacheManager.getCache(CACHE_ALIAS)
             val options = VertxOptions().setClusterManager(mgr)
             Vertx.rxClusteredVertx(options)
-                .subscribe { onSuccess: Vertx?, onError: Throwable? ->
-                    logger.info { "##.#####" + onSuccess.toString() }
+                .subscribe { onSuccess: Vertx?, throwable: Throwable? ->
+                    throwable?.let { logger.error { it.toString() } }
+                        ?: logger.info { "clustered vertx started: ${onSuccess?.isClustered}" }
                 }
         }.toCompletable().subscribeOn(Schedulers.io())
 
@@ -134,7 +131,7 @@ class RemoteProxyServiceImpl(
     }
 
     private fun getFromCacheOrRemoteApi(id: String, date: String, nasaApiKey: String): Single<Apod> {
-        return cache.get(date)?.let { Single.just(asApod(JsonObject(it))) } ?: with(AtomicInteger()) {
+        return cache.get(date)?.let { Single.just(it) } ?: with(AtomicInteger()) {
             circuitBreaker.rxExecuteWithFallback<Apod>({ future ->
                 if (this.getAndIncrement() > 0)
                     logger.info { "number of retries: ${this.get() - 1}" }
@@ -142,7 +139,7 @@ class RemoteProxyServiceImpl(
                     .subscribeOn(Schedulers.io())
                     .doOnSuccess {
                         if (!cache.containsKey(date)) {
-                            cache.put(date, it.toJsonString())
+                            cache.put(date, it)
                         }
                     }.subscribe({
                         future.complete(it)

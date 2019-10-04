@@ -1,4 +1,4 @@
-FROM weinschenker/kotlin-example:latest
+FROM azul/zulu-openjdk-alpine:12
 ARG APODRATING_PORT_ARG
 ENV APODRATING_PORT=${APODRATING_PORT_ARG}
 ARG APODRATING_H2_PORT_ARG
@@ -19,15 +19,9 @@ ARG NASA_API_KEY_ARG
 ENV NASA_API_KEY=${NASA_API_KEY_ARG}
 ARG CACHE_POOL_SIZE_ENTRIES_ARG
 ENV CACHE_POOL_SIZE_ENTRIES=${CACHE_POOL_SIZE_ENTRIES_ARG}
+COPY target/*.jar /run/
 
-
-EXPOSE 8081
-EXPOSE 8443
-EXPOSE 5701
-
-USER 10001
-COPY target/dependency-jars /run/dependency-jars
-COPY target/application.jar /run/application.jar
-
+EXPOSE ${APODRATING_PORT_ARG}
+EXPOSE ${APODRATING_H2_PORT_ARG}
 
 ENTRYPOINT ["java", "-jar", "run/application.jar", "-D", "exec.mainClass=\"apodrating.MainKt\""]
