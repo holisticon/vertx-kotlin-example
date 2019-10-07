@@ -98,7 +98,7 @@ class ApodRatingVerticleTest {
             .parallel().runOn(Schedulers.computation())
             .flatMap { it.toFlowable() }
             .sequential().toList()
-            .doAfterSuccess { webClient = WebClient.create(vertx) }
+            .doOnSuccess { webClient = WebClient.create(vertx) }
             .subscribeOn(Schedulers.computation())
             .subscribe({ testContext.completeNow() }) { error -> logger.error { error } }
     }
