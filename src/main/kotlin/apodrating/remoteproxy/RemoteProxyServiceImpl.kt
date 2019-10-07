@@ -137,10 +137,12 @@ class RemoteProxyServiceImpl(
                     logger.info { "number of retries: ${this.get() - 1}" }
                 rxSendGet(date, nasaApiKey, id)
                     .subscribeOn(Schedulers.io())
-                    .doOnSuccess {
-                        cache.putIfAbsent(date, it)
-                    }.subscribe({
-                        future.complete(it)
+                    .flatMap { apod ->
+                        Single.fromFuture(cache.putIfAbsentAsync(date, apod))
+                            .map { newlyAddedToCache -> Pair(apod, newlyAddedToCache) }
+                    }
+                    .subscribe({
+                        future.complete(it.first)
                     }) { future.fail(it) }
             }) {
                 logger.error { "Circuit opened. Error: $it - message: ${it.message}" }
