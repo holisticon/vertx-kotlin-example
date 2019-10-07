@@ -138,9 +138,7 @@ class RemoteProxyServiceImpl(
                 rxSendGet(date, nasaApiKey, id)
                     .subscribeOn(Schedulers.io())
                     .doOnSuccess {
-                        if (!cache.containsKey(date)) {
-                            cache.put(date, it)
-                        }
+                        cache.putIfAbsent(date, it)
                     }.subscribe({
                         future.complete(it)
                     }) { future.fail(it) }
