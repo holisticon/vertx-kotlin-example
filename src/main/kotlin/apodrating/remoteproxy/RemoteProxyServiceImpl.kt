@@ -14,6 +14,7 @@ import apodrating.model.toJsonObject
 import apodrating.webapi.handleFailure
 import com.hazelcast.cache.ICache
 import com.hazelcast.config.CacheSimpleConfig
+import com.hazelcast.config.EvictionConfig
 import com.hazelcast.core.Hazelcast
 import com.hazelcast.core.HazelcastInstance
 import com.hazelcast.core.ICacheManager
@@ -60,12 +61,14 @@ class RemoteProxyServiceImpl(
             val hazelcastConfig = ConfigUtil.loadConfig()
             val cacheConfig = CacheSimpleConfig()
             cacheConfig.name = CACHE_ALIAS
+            cacheConfig.evictionConfig.size = apodConfig.cacheSize
+            cacheConfig.evictionConfig.maximumSizePolicy = EvictionConfig.MaxSizePolicy.ENTRY_COUNT
             cacheConfig.expiryPolicyFactoryConfig = CacheSimpleConfig.ExpiryPolicyFactoryConfig(
                 CacheSimpleConfig.ExpiryPolicyFactoryConfig.TimedExpiryPolicyFactoryConfig(
                     CacheSimpleConfig
                         .ExpiryPolicyFactoryConfig.TimedExpiryPolicyFactoryConfig.ExpiryPolicyType.CREATED,
                     CacheSimpleConfig.ExpiryPolicyFactoryConfig.DurationConfig(
-                        60,
+                        apodConfig.cacheLifetimeMinutes,
                         TimeUnit.MINUTES
                     )
                 )
@@ -113,16 +116,7 @@ class RemoteProxyServiceImpl(
         getFromCacheOrRemoteApi(id, date, nasaApiKey)
             .filter { it.isEmpty().not() }
             .map { Future.succeededFuture(it.toJsonObject()) }
-            .switchIfEmpty(
-                Maybe.just(
-                    Future.failedFuture(
-                        ServiceException(
-                            HttpStatus.SC_NOT_FOUND,
-                            "not found"
-                        )
-                    )
-                )
-            )
+            .switchIfEmpty(maybeOfFailedFuture())
             .subscribeOn(Schedulers.io())
             .subscribe(resultHandler::handle) {
                 handleFailure(resultHandler, it, HttpStatus.SC_INTERNAL_SERVER_ERROR)
@@ -130,11 +124,12 @@ class RemoteProxyServiceImpl(
         return this
     }
 
-    private fun getFromCacheOrRemoteApi(id: String, date: String, nasaApiKey: String): Single<Apod> {
-        return cache.get(date)?.let { Single.just(it) } ?: with(AtomicInteger()) {
-            circuitBreaker.rxExecuteWithFallback<Apod>({ future ->
-                if (this.getAndIncrement() > 0)
-                    logger.info { "number of retries: ${this.get() - 1}" }
+    private fun getFromCacheOrRemoteApi(id: String, date: String, nasaApiKey: String): Single<Apod> = Maybe
+        .fromFuture(cache.getAsync(date))
+        .switchIfEmpty(with(AtomicInteger(), {
+            circuitBreaker.rxExecuteWithFallback({ future ->
+                if (getAndIncrement() > 0)
+                    logger.info { "number of retries: ${get() - 1}" }
                 rxSendGet(date, nasaApiKey, id)
                     .subscribeOn(Schedulers.io())
                     .flatMap { apod ->
@@ -148,8 +143,7 @@ class RemoteProxyServiceImpl(
                 logger.error { "Circuit opened. Error: $it - message: ${it.message}" }
                 emptyApod()
             }
-        }
-    }
+        }))
 
     private fun rxSendGet(date: String, nasaApiKey: String, apodId: String): Single<Apod> =
         webClient.getAbs(apodConfig.nasaApiHost)
@@ -163,6 +157,17 @@ class RemoteProxyServiceImpl(
             .rxSend()
             .map { it.body() }
             .map { asApod(apodId, it) }
+
+    private fun maybeOfFailedFuture(): Maybe<Future<JsonObject>> {
+        return Maybe.just(
+            Future.failedFuture(
+                ServiceException(
+                    HttpStatus.SC_NOT_FOUND,
+                    "not found"
+                )
+            )
+        )
+    }
 
     /**
      * close resources

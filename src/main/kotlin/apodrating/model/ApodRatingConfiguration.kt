@@ -22,7 +22,8 @@ data class ApodRatingConfiguration(
     val nasaApiKey: String = config.getString("NASA_API_KEY"),
     val nasaApiHost: String = config.getString("NASA_API_HOST"),
     val nasaApiPath: String = config.getString("NASA_API_PATH"),
-    val cacheSize: Long = config.getLong("CACHE_POOL_SIZE_ENTRIES")
+    val cacheSize: Int = config.getInteger("CACHE_POOL_SIZE_ENTRIES"),
+    val cacheLifetimeMinutes: Long = config.getLong("CACHE_LIFETIME_MINUTES")
 
 ) {
 
