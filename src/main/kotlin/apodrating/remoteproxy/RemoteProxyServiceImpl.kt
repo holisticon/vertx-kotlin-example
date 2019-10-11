@@ -46,7 +46,8 @@ import java.util.concurrent.atomic.AtomicInteger
  * Service implementation to access the remote NASA apod api.
  */
 class RemoteProxyServiceImpl(
-    val vertx: Vertx, val config: JsonObject,
+    private val vertx: Vertx,
+    private val config: JsonObject,
     private val apodConfig: ApodRatingConfiguration = ApodRatingConfiguration(config)
 ) : RemoteProxyService {
 
