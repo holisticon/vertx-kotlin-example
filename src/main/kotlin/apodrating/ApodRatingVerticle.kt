@@ -20,6 +20,7 @@ import io.vertx.core.http.HttpServerOptions
 import io.vertx.core.json.JsonObject
 import io.vertx.kotlin.core.net.pemKeyCertOptionsOf
 import io.vertx.kotlin.coroutines.CoroutineVerticle
+import io.vertx.reactivex.core.AbstractVerticle
 import io.vertx.reactivex.core.Vertx
 import io.vertx.reactivex.core.http.HttpServer
 import io.vertx.reactivex.core.http.HttpServerRequest
@@ -35,7 +36,7 @@ import org.apache.http.HttpStatus
 /**
  * Implements our REST interface
  */
-class ApodRatingVerticle : CoroutineVerticle() {
+class ApodRatingVerticle : AbstractVerticle() {
 
     companion object : KLogging()
 
@@ -50,13 +51,13 @@ class ApodRatingVerticle : CoroutineVerticle() {
      * - Initialize webserver
      */
     override fun start(startFuture: Promise<Void>?) {
-        val apodConfig = ApodRatingConfiguration(config)
-        rxVertx = Vertx(vertx)
+        val apodConfig = ApodRatingConfiguration(config())
+        rxVertx = vertx
         client = JDBCClient.createShared(rxVertx, apodConfig.toJdbcConfig())
         apiKey = apodConfig.nasaApiKey
 
         Single.zip(
-            serviceBinderCompletable(rxVertx, config).toSingleDefault(true).onErrorReturn { false },
+            serviceBinderCompletable(rxVertx, config()).toSingleDefault(true).onErrorReturn { false },
             databaseObs(),
             http11Server(apodConfig),
             http2Server(apodConfig),
@@ -122,17 +123,9 @@ class ApodRatingVerticle : CoroutineVerticle() {
 
     private fun createRouter(routerFactory: OpenAPI3RouterFactory): Handler<HttpServerRequest> =
         routerFactory.apply {
-            coroutineSecurityHandler(API_AUTH_KEY) { handleApiKeyValidation(it, apiKey) }
+            addSecurityHandler(API_AUTH_KEY){ handleApiKeyValidation(it, apiKey) }
         }.router.apply {
             route(STATIC_PATH).handler(StaticHandler.create())
-        }
-
-    private fun OpenAPI3RouterFactory.coroutineSecurityHandler(
-        securitySchemaName: String,
-        function: suspend (RoutingContext) -> Unit
-    ) =
-        addSecurityHandler(securitySchemaName) {
-            launch { function(it) }
         }
 
     private fun handleApiKeyValidation(ctx: RoutingContext, apiKey: String) =
