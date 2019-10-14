@@ -85,10 +85,6 @@
         </dependency>
         <dependency>
             <groupId>io.vertx</groupId>
-            <artifactId>vertx-lang-kotlin-coroutines</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.vertx</groupId>
             <artifactId>vertx-service-proxy</artifactId>
         </dependency>
         <dependency>
@@ -494,8 +490,7 @@
                         <include>**/*Test</include>
                         <include>**/*Tests</include>
                     </includes>
-                    <argLine>${env.J_ARG_LINE} </argLine>
-                    <argLine>${argLine}</argLine>
+                    <argLine>${env.J_ARG_LINE} ${argLine}</argLine>
                 </configuration>
                 <dependencies>
                     <dependency>

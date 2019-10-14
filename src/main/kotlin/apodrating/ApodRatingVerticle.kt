@@ -19,7 +19,6 @@ import io.vertx.core.Promise
 import io.vertx.core.http.HttpServerOptions
 import io.vertx.core.json.JsonObject
 import io.vertx.kotlin.core.net.pemKeyCertOptionsOf
-import io.vertx.kotlin.coroutines.CoroutineVerticle
 import io.vertx.reactivex.core.AbstractVerticle
 import io.vertx.reactivex.core.Vertx
 import io.vertx.reactivex.core.http.HttpServer
@@ -29,7 +28,6 @@ import io.vertx.reactivex.ext.web.RoutingContext
 import io.vertx.reactivex.ext.web.api.contract.openapi3.OpenAPI3RouterFactory
 import io.vertx.reactivex.ext.web.handler.StaticHandler
 import io.vertx.serviceproxy.ServiceBinder
-import kotlinx.coroutines.launch
 import mu.KLogging
 import org.apache.http.HttpStatus
 
@@ -42,7 +40,6 @@ class ApodRatingVerticle : AbstractVerticle() {
 
     private lateinit var client: JDBCClient
     private lateinit var apiKey: String
-    private lateinit var rxVertx: Vertx
 
     /**
      * - Start the verticle.
@@ -52,12 +49,11 @@ class ApodRatingVerticle : AbstractVerticle() {
      */
     override fun start(startFuture: Promise<Void>?) {
         val apodConfig = ApodRatingConfiguration(config())
-        rxVertx = vertx
-        client = JDBCClient.createShared(rxVertx, apodConfig.toJdbcConfig())
+        client = JDBCClient.createShared(vertx, apodConfig.toJdbcConfig())
         apiKey = apodConfig.nasaApiKey
 
         Single.zip(
-            serviceBinderCompletable(rxVertx, config()).toSingleDefault(true).onErrorReturn { false },
+            serviceBinderCompletable(vertx, config()).toSingleDefault(true).onErrorReturn { false },
             databaseObs(),
             http11Server(apodConfig),
             http2Server(apodConfig),
@@ -113,17 +109,17 @@ class ApodRatingVerticle : AbstractVerticle() {
         port: Int,
         httpServerOptions: HttpServerOptions? = null
     ): Single<HttpServer> =
-        OpenAPI3RouterFactory.rxCreate(rxVertx, "swagger.yaml")
+        OpenAPI3RouterFactory.rxCreate(vertx, "swagger.yaml")
             .map { it.mountServicesFromExtensions() }
             .map { routerFactory ->
-                (httpServerOptions?.let { rxVertx.createHttpServer(it) }
-                    ?: rxVertx.createHttpServer()).requestHandler(createRouter(routerFactory))
+                (httpServerOptions?.let { vertx.createHttpServer(it) }
+                    ?: vertx.createHttpServer()).requestHandler(createRouter(routerFactory))
             }
             .flatMap { it.rxListen(port) }
 
     private fun createRouter(routerFactory: OpenAPI3RouterFactory): Handler<HttpServerRequest> =
         routerFactory.apply {
-            addSecurityHandler(API_AUTH_KEY){ handleApiKeyValidation(it, apiKey) }
+            addSecurityHandler(API_AUTH_KEY) { handleApiKeyValidation(it, apiKey) }
         }.router.apply {
             route(STATIC_PATH).handler(StaticHandler.create())
         }

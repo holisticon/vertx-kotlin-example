@@ -2,50 +2,30 @@ package apodrating.mock
 
 import apodrating.mock.model.MockApod
 import io.vertx.core.Promise
-import io.vertx.kotlin.coroutines.CoroutineVerticle
-import io.vertx.reactivex.core.Vertx
+import io.vertx.reactivex.core.AbstractVerticle
 import io.vertx.reactivex.ext.web.RoutingContext
 import io.vertx.reactivex.ext.web.api.contract.openapi3.OpenAPI3RouterFactory
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import mu.KLogging
 import org.apache.http.HttpStatus
 
 /**
  * Mock the NASA api to allow integration tests without accessing the real API.
  */
-class MockServiceVerticle : CoroutineVerticle() {
+class MockServiceVerticle : AbstractVerticle() {
     companion object : KLogging()
 
-    private lateinit var rxVertx: Vertx
-
     override fun start(startFuture: Promise<Void>?) {
-        launch {
-            rxVertx = Vertx(vertx)
-            withContext(
-                Dispatchers.IO, rxStartHttpServer(config.getInteger("MOCKSERVER_PORT"), startFuture)
-            )
-        }
-        startFuture?.complete()
-    }
-
-    private fun rxStartHttpServer(
-        port: Int,
-        startFuture: Promise<Void>?
-    ): suspend CoroutineScope.() -> Unit = {
-        OpenAPI3RouterFactory.rxCreate(rxVertx, "mock-api.yaml")
+        OpenAPI3RouterFactory.rxCreate(vertx, "mock-api.yaml")
             .map {
-                it.coroutineHandler(operationId = "getMockData") { handlePutApodRating(it) }
+                it.addHandlerByOperationId("getMockData") { handlePutApodRating(it) }
             }.map {
-                rxVertx.createHttpServer()
+                vertx.createHttpServer()
                     .requestHandler(it.router)
-                    .listen(port)
+                    .listen(config().getInteger("MOCKSERVER_PORT"))
             }
             .subscribe({ logger.info { "started mockserver on port ${it.actualPort()}" } })
             { startFuture?.fail("could not start http2 server.") }
-
+        startFuture?.complete()
     }
 
     private fun handlePutApodRating(ctx: RoutingContext) {
@@ -64,11 +44,5 @@ class MockServiceVerticle : CoroutineVerticle() {
             .setStatusCode(HttpStatus.SC_OK)
             .end(io.vertx.core.json.JsonObject.mapFrom(apod).encode())
     }
-
-    private fun OpenAPI3RouterFactory.coroutineHandler(
-        operationId: String,
-        function: suspend (RoutingContext) -> Unit
-    ) =
-        addHandlerByOperationId(operationId) { launch { function(it) } }
 }
 
