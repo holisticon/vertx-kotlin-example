@@ -170,9 +170,6 @@ class RemoteProxyServiceImpl(
         )
     }
 
-    /**
-     * close resources
-     */
     override fun close() {
         webClient.close()
         circuitBreaker.close()

@@ -19,11 +19,6 @@ import io.vertx.reactivex.ext.jdbc.JDBCClient
 import mu.KLogging
 import org.apache.http.HttpStatus
 
-/**
- * Implementation of all APOD rating related queries.
- *
- * @see https://vertx.io/docs/vertx-web-api-service/java/
- */
 class RatingServiceImpl(
     val vertx: Vertx,
     val config: JsonObject,
@@ -33,9 +28,6 @@ class RatingServiceImpl(
 
     companion object : KLogging()
 
-    /**
-     * Get a rating for an apod
-     */
     override fun getRating(
         apodId: String,
         context: OperationRequest,
@@ -54,9 +46,6 @@ class RatingServiceImpl(
         return this
     }
 
-    /**
-     * Add a rating for an apod
-     */
     override fun putRating(
         apodId: String,
         context: OperationRequest,
@@ -79,9 +68,6 @@ class RatingServiceImpl(
         return this
     }
 
-    /**
-     * close resources
-     */
     override fun close() {
         jdbc.close()
     }

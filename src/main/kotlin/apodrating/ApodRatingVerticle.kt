@@ -31,26 +31,16 @@ import io.vertx.serviceproxy.ServiceBinder
 import mu.KLogging
 import org.apache.http.HttpStatus
 
-/**
- * Implements our REST interface
- */
 class ApodRatingVerticle : AbstractVerticle() {
 
     companion object : KLogging()
 
     private lateinit var client: JDBCClient
-    private lateinit var apiKey: String
+    private lateinit var apodConfig: ApodRatingConfiguration
 
-    /**
-     * - Start the verticle.
-     * - Initialize Database
-     * - Initialize vertx router
-     * - Initialize webserver
-     */
     override fun start(startFuture: Promise<Void>?) {
-        val apodConfig = ApodRatingConfiguration(config())
+        apodConfig = ApodRatingConfiguration(config())
         client = JDBCClient.createShared(vertx, apodConfig.toJdbcConfig())
-        apiKey = apodConfig.nasaApiKey
 
         Single.zip(
             serviceBinderCompletable(vertx, config()).toSingleDefault(true).onErrorReturn { false },
@@ -119,7 +109,7 @@ class ApodRatingVerticle : AbstractVerticle() {
 
     private fun createRouter(routerFactory: OpenAPI3RouterFactory): Handler<HttpServerRequest> =
         routerFactory.apply {
-            addSecurityHandler(API_AUTH_KEY) { handleApiKeyValidation(it, apiKey) }
+            addSecurityHandler(API_AUTH_KEY) { handleApiKeyValidation(it, apodConfig.nasaApiKey) }
         }.router.apply {
             route(STATIC_PATH).handler(StaticHandler.create())
         }

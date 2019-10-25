@@ -30,11 +30,6 @@ import mu.KLogging
 import org.apache.http.HttpStatus
 import java.sql.SQLIntegrityConstraintViolationException
 
-/**
- * Implementation of all APOD related queries.
- *
- * @see https://vertx.io/docs/vertx-web-api-service/java/
- */
 class ApodQueryServiceImpl(
     val vertx: Vertx,
     val config: JsonObject,

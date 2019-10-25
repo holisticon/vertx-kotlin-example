@@ -12,19 +12,11 @@ import io.vertx.ext.web.api.OperationRequest
 import io.vertx.ext.web.api.OperationResponse
 import io.vertx.ext.web.api.generator.WebApiServiceGen
 
-/**
- * Interface for the service for all APOD rating related queries.
- *
- * @see https://vertx.io/docs/vertx-web-api-service/java/
- */
 @WebApiServiceGen
 @ProxyGen
 @VertxGen
 interface RatingService {
 
-    /**
-     * Get a rating for an apod
-     */
     @Fluent
     fun putRating(
         apodId: String,
@@ -32,9 +24,6 @@ interface RatingService {
         resultHandler: Handler<AsyncResult<OperationResponse>>
     ): RatingService
 
-    /**
-     * Add a rating for an apod
-     */
     @Fluent
     fun getRating(
         apodId: String,
@@ -42,9 +31,6 @@ interface RatingService {
         resultHandler: Handler<AsyncResult<OperationResponse>>
     ): RatingService
 
-    /**
-     *  Used to denote that a call to this function will close the remote connection to the event bus.
-     */
     @ProxyClose
     fun close()
 }

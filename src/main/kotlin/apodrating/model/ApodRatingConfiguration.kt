@@ -9,9 +9,6 @@ import io.vertx.kotlin.core.json.obj
 import io.vertx.reactivex.config.ConfigRetriever
 import io.vertx.reactivex.core.Vertx
 
-/**
- * Holds the configurtion of our application.
- */
 data class ApodRatingConfiguration(
     val config: JsonObject,
     val port: Int = config.getInteger("APODRATING_PORT"),
@@ -26,10 +23,6 @@ data class ApodRatingConfiguration(
     val cacheLifetimeMinutes: Long = config.getLong("CACHE_LIFETIME_MINUTES")
 
 ) {
-
-    /**
-     * Return a JSON representation of this config object.
-     */
     fun toJdbcConfig() = json {
         obj(
             "url" to jdbcUrl,
@@ -39,9 +32,6 @@ data class ApodRatingConfiguration(
     }
 }
 
-/**
- * Convert ConfigRetrieverOptions into DeploymentOptions
- */
 fun ConfigRetrieverOptions.deploymentOptions(vertx: Vertx): Single<DeploymentOptions> =
     ConfigRetriever.create(vertx, this).rxGetConfig()
         .map { JsonObject().put("config", it) }
