@@ -137,7 +137,7 @@ class ApodRatingVerticleTest {
             .rxSend()
             .retryWhen { throwableOccurs(it) }
             .map { it.body() }
-            .map { VertxMatcherAssert.assertThat(testContext, it.size(), Matchers.`is`(3)) }
+            .map { VertxMatcherAssert.assertThat(testContext, it.size(), Matchers.`is`(10)) }
             .subscribe({ testContext.completeNow() }) { testContext.failNow(it) }
     }
 

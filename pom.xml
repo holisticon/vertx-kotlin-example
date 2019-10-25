@@ -24,7 +24,7 @@
         <hsqldb.version>2.5.0</hsqldb.version>
         <junit-jupiter.version>5.5.2</junit-jupiter.version>
         <junit-platform.version>1.5.2</junit-platform.version>
-        <hamcrest.version>2.1</hamcrest.version>
+        <hamcrest.version>2.2</hamcrest.version>
         <moshi-kotlin.version>1.8.0</moshi-kotlin.version>
         <c3p0.version>0.9.5.4</c3p0.version>
         <rxkotlin.version>2.4.0</rxkotlin.version>
