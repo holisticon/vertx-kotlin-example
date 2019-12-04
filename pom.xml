@@ -30,6 +30,9 @@
         <rxkotlin.version>2.4.0</rxkotlin.version>
         <cache-api.version>1.1.1</cache-api.version>
         <hazelcast.version>3.12.4</hazelcast.version>
+        <log4j.version>2.12.1</log4j.version>
+        <disruptor.version>3.4.2</disruptor.version>
+        <httpclient.version>4.5.9</httpclient.version>
 
         <maven-surefire-plugin.version>2.22.2</maven-surefire-plugin.version>
         <maven-compiler-plugin.version>3.8.1</maven-compiler-plugin.version>
@@ -37,7 +40,7 @@
         <maven-dependency-plugin.version>3.1.1</maven-dependency-plugin.version>
         <jacoco-maven-plugin.version>0.8.5</jacoco-maven-plugin.version>
         <codacy-maven-plugin.version>1.2.0</codacy-maven-plugin.version>
-        <openapi-generator-maven-plugin.version>4.2.1</openapi-generator-maven-plugin.version>
+        <openapi-generator-maven-plugin.version>4.2.2</openapi-generator-maven-plugin.version>
         <gitflow-maven-plugin.version>1.13.0</gitflow-maven-plugin.version>
         <dockerfile-maven.version>1.4.13</dockerfile-maven.version>
     </properties>
@@ -55,6 +58,7 @@
     </dependencyManagement>
 
     <dependencies>
+        <!-- vertx -->
         <dependency>
             <groupId>io.vertx</groupId>
             <artifactId>vertx-lang-kotlin</artifactId>
@@ -102,16 +106,6 @@
             </exclusions>
         </dependency>
         <dependency>
-            <groupId>javax.cache</groupId>
-            <artifactId>cache-api</artifactId>
-            <version>${cache-api.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.mchange</groupId>
-            <artifactId>c3p0</artifactId>
-            <version>${c3p0.version}</version>
-        </dependency>
-        <dependency>
             <groupId>io.vertx</groupId>
             <artifactId>vertx-circuit-breaker</artifactId>
         </dependency>
@@ -119,7 +113,6 @@
             <groupId>io.vertx</groupId>
             <artifactId>vertx-rx-java2</artifactId>
         </dependency>
-
         <dependency>
             <groupId>io.vertx</groupId>
             <artifactId>vertx-rx-java2-gen</artifactId>
@@ -134,29 +127,49 @@
             <groupId>io.vertx</groupId>
             <artifactId>vertx-web-api-service</artifactId>
         </dependency>
+        <dependency>
+            <groupId>io.vertx</groupId>
+            <artifactId>vertx-web-client</artifactId>
+        </dependency>
 
+        <!-- Database -->
         <dependency>
             <groupId>org.hsqldb</groupId>
             <artifactId>hsqldb</artifactId>
             <version>${hsqldb.version}</version>
         </dependency>
 
+        <!-- Logging -->
         <dependency>
             <groupId>io.github.microutils</groupId>
             <artifactId>kotlin-logging</artifactId>
             <version>${kotlin-logging.version}</version>
         </dependency>
-
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-simple</artifactId>
             <version>${slf4j-simple.version}</version>
         </dependency>
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-api</artifactId>
+            <version>${log4j.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-core</artifactId>
+            <version>${log4j.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.lmax</groupId>
+            <artifactId>disruptor</artifactId>
+            <version>${disruptor.version}</version>
+        </dependency>
 
         <dependency>
             <groupId>org.apache.httpcomponents</groupId>
             <artifactId>httpclient</artifactId>
-            <version>4.5.9</version>
+            <version>${httpclient.version}</version>
         </dependency>
 
         <dependency>
@@ -182,10 +195,7 @@
             <version>${hamcrest.version}</version>
             <scope>test</scope>
         </dependency>
-        <dependency>
-            <groupId>io.vertx</groupId>
-            <artifactId>vertx-web-client</artifactId>
-        </dependency>
+
         <dependency>
             <groupId>io.vertx</groupId>
             <artifactId>vertx-junit5</artifactId>
@@ -201,10 +211,16 @@
             <artifactId>rxkotlin</artifactId>
             <version>${rxkotlin.version}</version>
         </dependency>
+
         <dependency>
-            <groupId>org.openapitools</groupId>
-            <artifactId>openapi-generator</artifactId>
-            <version>${openapi-generator-maven-plugin.version}</version>
+            <groupId>javax.cache</groupId>
+            <artifactId>cache-api</artifactId>
+            <version>${cache-api.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.mchange</groupId>
+            <artifactId>c3p0</artifactId>
+            <version>${c3p0.version}</version>
         </dependency>
     </dependencies>
     <profiles>
