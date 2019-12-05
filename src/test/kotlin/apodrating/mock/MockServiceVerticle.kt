@@ -5,14 +5,14 @@ import io.vertx.core.Promise
 import io.vertx.reactivex.core.AbstractVerticle
 import io.vertx.reactivex.ext.web.RoutingContext
 import io.vertx.reactivex.ext.web.api.contract.openapi3.OpenAPI3RouterFactory
-import mu.KLogging
+import org.apache.logging.log4j.kotlin.Logging
 import org.apache.http.HttpStatus
 
 /**
  * Mock the NASA api to allow integration tests without accessing the real API.
  */
 class MockServiceVerticle : AbstractVerticle() {
-    companion object : KLogging()
+    companion object : Logging
 
     override fun start(startFuture: Promise<Void>?) {
         OpenAPI3RouterFactory.rxCreate(vertx, "mock-api.yaml")

@@ -26,7 +26,7 @@ import io.vertx.kotlin.core.json.get
 import io.vertx.kotlin.core.json.json
 import io.vertx.reactivex.core.Vertx
 import io.vertx.reactivex.ext.jdbc.JDBCClient
-import mu.KLogging
+import org.apache.logging.log4j.kotlin.Logging
 import org.apache.http.HttpStatus
 import java.sql.SQLIntegrityConstraintViolationException
 
@@ -37,7 +37,7 @@ class ApodQueryServiceImpl(
     private val jdbc: JDBCClient = JDBCClient.createShared(vertx, apodConfig.toJdbcConfig())
 ) : ApodQueryService {
 
-    companion object : KLogging()
+    companion object : Logging
 
     private val proxyService: RemoteProxyService =
         RemoteProxyServiceFactory.createProxy(vertx.delegate, REMOTE_PROXY_SERVICE_ADDRESS)

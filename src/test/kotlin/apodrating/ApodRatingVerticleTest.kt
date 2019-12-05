@@ -21,7 +21,7 @@ import io.vertx.reactivex.config.ConfigRetriever
 import io.vertx.reactivex.core.Vertx
 import io.vertx.reactivex.ext.web.client.WebClient
 import io.vertx.reactivex.ext.web.codec.BodyCodec
-import mu.KLogging
+import org.apache.logging.log4j.kotlin.Logging
 import org.apache.http.HttpStatus
 import org.hamcrest.Matchers
 import org.junit.jupiter.api.AfterAll
@@ -50,7 +50,7 @@ private const val DELAY_MS: Long = 100
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
 class ApodRatingVerticleTest {
 
-    companion object : KLogging()
+    companion object : Logging
 
     private lateinit var testConfig: ApodRatingConfiguration
 

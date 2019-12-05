@@ -37,7 +37,7 @@ import io.vertx.reactivex.ext.web.codec.BodyCodec
 import io.vertx.serviceproxy.ServiceException
 import io.vertx.spi.cluster.hazelcast.ConfigUtil
 import io.vertx.spi.cluster.hazelcast.HazelcastClusterManager
-import mu.KLogging
+import org.apache.logging.log4j.kotlin.Logging
 import org.apache.http.HttpStatus
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
@@ -51,7 +51,7 @@ class RemoteProxyServiceImpl(
     private val apodConfig: ApodRatingConfiguration = ApodRatingConfiguration(config)
 ) : RemoteProxyService {
 
-    companion object : KLogging()
+    companion object : Logging
 
     private lateinit var circuitBreaker: CircuitBreaker
     private lateinit var webClient: WebClient

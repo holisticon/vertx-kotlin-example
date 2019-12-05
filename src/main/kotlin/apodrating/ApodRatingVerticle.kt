@@ -28,12 +28,12 @@ import io.vertx.reactivex.ext.web.RoutingContext
 import io.vertx.reactivex.ext.web.api.contract.openapi3.OpenAPI3RouterFactory
 import io.vertx.reactivex.ext.web.handler.StaticHandler
 import io.vertx.serviceproxy.ServiceBinder
-import mu.KLogging
+import org.apache.logging.log4j.kotlin.Logging
 import org.apache.http.HttpStatus
 
 class ApodRatingVerticle : AbstractVerticle() {
 
-    companion object : KLogging()
+    companion object : Logging
 
     private lateinit var client: JDBCClient
     private lateinit var apodConfig: ApodRatingConfiguration

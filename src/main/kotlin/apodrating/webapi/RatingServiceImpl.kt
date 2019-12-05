@@ -16,7 +16,7 @@ import io.vertx.kotlin.core.json.array
 import io.vertx.kotlin.core.json.json
 import io.vertx.reactivex.core.Vertx
 import io.vertx.reactivex.ext.jdbc.JDBCClient
-import mu.KLogging
+import org.apache.logging.log4j.kotlin.Logging
 import org.apache.http.HttpStatus
 
 class RatingServiceImpl(
@@ -26,7 +26,7 @@ class RatingServiceImpl(
     private val jdbc: JDBCClient = JDBCClient.createShared(vertx, apodConfig.toJdbcConfig())
 ) : RatingService {
 
-    companion object : KLogging()
+    companion object : Logging
 
     override fun getRating(
         apodId: String,
