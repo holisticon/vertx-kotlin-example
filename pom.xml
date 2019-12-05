@@ -502,6 +502,8 @@
                         <include>**/*Tests</include>
                     </includes>
                     <argLine>${env.J_ARG_LINE} ${argLine}</argLine>
+                    <forkCount>3</forkCount>
+                    <reuseForks>true</reuseForks>
                 </configuration>
                 <dependencies>
                     <dependency>
