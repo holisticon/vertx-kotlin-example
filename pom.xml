@@ -38,7 +38,7 @@
         <maven-dependency-plugin.version>3.1.1</maven-dependency-plugin.version>
         <jacoco-maven-plugin.version>0.8.5</jacoco-maven-plugin.version>
         <codacy-maven-plugin.version>1.2.0</codacy-maven-plugin.version>
-        <openapi-generator-maven-plugin.version>4.2.3-SNAPSHOT</openapi-generator-maven-plugin.version>
+        <openapi-generator-maven-plugin.version>4.2.2</openapi-generator-maven-plugin.version>
         <gitflow-maven-plugin.version>1.13.0</gitflow-maven-plugin.version>
         <dockerfile-maven.version>1.4.13</dockerfile-maven.version>
     </properties>
