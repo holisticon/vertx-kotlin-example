@@ -2,7 +2,7 @@ language: java
 jdk: openjdk11
 
 install:
-  - mvn test-compile -DskipTests=true -Dmaven.javadoc.skip=true -B -V -P codacycoverage
+  - mvn test-compile -DskipTests=true -Dmaven.javadoc.skip=true -B -V -P codacycoverage  -Dvertx.logger-delegate-factory-class-name=io.vertx.core.logging.Log4j2LogDelegateFactory -Dlog4j2.contextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector
 script:
   - mvn clean jacoco:prepare-agent package jacoco:report  -P codacycoverage  -Dvertx.logger-delegate-factory-class-name=io.vertx.core.logging.Log4j2LogDelegateFactory -Dlog4j2.contextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector
 after_success:
