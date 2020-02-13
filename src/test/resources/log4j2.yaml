@@ -1,0 +1,21 @@
+Configuration:
+  Appenders:
+    Console:
+      PatternLayout:
+        pattern: '%d{ABSOLUTE} %5p |%X{test-name}| - [%c{1}] %t - %m%n'
+      name: Console
+      target: SYSTEM_OUT
+  Loggers:
+    Root:
+      AppenderRef:
+        - ref: Console
+      level: info
+    logger:
+      - name: com.hazelcast.client.impl.protocol.task
+        level: debug
+      - name: com.hazelcast.client.impl.operations
+        level: debug
+      - name: io.vertx
+        level: trace
+      - name: apodrating
+        level: trace
